@@ -1,4 +1,4 @@
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { Player } from '../entities/Player';
 import { Bullet } from '../entities/Bullet';
 import { Enemy } from '../entities/Enemy';
@@ -10,6 +10,7 @@ import { WaveManager } from '../managers/WaveManager';
 import { PlayerData } from '../managers/PlayerData';
 import { SHIPS } from '../data/ships';
 import { UPGRADES } from '../data/upgrades';
+import { getEnemyById } from '../data/enemies';
 import { HUD } from '../ui/HUD';
 import { TouchControls } from '../ui/TouchControls';
 
@@ -20,6 +21,7 @@ export class GameScene extends Phaser.Scene {
   private enemies!: Phaser.GameObjects.Group;
   private powerUps!: Phaser.GameObjects.Group;
   private boss: Boss | null = null;
+  private midBoss: Boss | null = null;
   private runState!: RunState;
   private skillManager!: SkillManager;
   private waveManager!: WaveManager;
@@ -86,6 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.waveManager = new WaveManager(this.stageIndex);
     this.waveTransition = false;
     this.boss = null;
+    this.midBoss = null;
   }
 
   private createBackground(): void {
@@ -149,7 +152,7 @@ export class GameScene extends Phaser.Scene {
       runChildUpdate: true,
     });
     for (let i = 0; i < 40; i++) {
-      const e = new Enemy(this, -50, -50, 'enemy_drifter');
+      const e = new Enemy(this, -50, -50, 'enemy_1');
       e.deactivate();
       this.enemies.add(e);
     }
@@ -237,10 +240,44 @@ export class GameScene extends Phaser.Scene {
           this.runState.coins += Math.ceil(pu.value * this.runState.coinMultiplier);
         } else if (pu.powerUpType === 'heal') {
           this.runState.hp = Math.min(this.runState.hp + 1, this.runState.maxHp);
+        } else if (pu.powerUpType === 'special') {
+          this.collectSpecialDrop(pu);
         }
         pu.deactivate();
       }
     );
+  }
+
+  private collectSpecialDrop(pu: PowerUp): void {
+    switch (pu.specialDropType) {
+      case 'gacha_ticket':
+        this.playerData.addGachaTicket(1);
+        this.showFloatingText(pu.x, pu.y, '🎫 +1', '#ff44ff');
+        break;
+      case 'gem':
+        this.playerData.addGems(1);
+        this.showFloatingText(pu.x, pu.y, '💎 +1', '#44aaff');
+        break;
+      case 'rare_part':
+        // Reserved for future use
+        this.showFloatingText(pu.x, pu.y, '⚙ +1', '#ffaa00');
+        break;
+      default:
+        break;
+    }
+  }
+
+  private showFloatingText(x: number, y: number, text: string, color: string): void {
+    const t = this.add.text(x, y, text, {
+      fontSize: '16px', color, fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(60);
+    this.tweens.add({
+      targets: t,
+      y: y - 40,
+      alpha: 0,
+      duration: 900,
+      onComplete: () => t.destroy(),
+    });
   }
 
   update(time: number, delta: number): void {
@@ -282,22 +319,48 @@ export class GameScene extends Phaser.Scene {
     if (spawnCmd) {
       const enemy = this.enemies.getFirstDead(false) as Enemy | null;
       if (enemy) {
-        const texKey = `enemy_${spawnCmd.enemyType}`;
-        enemy.setTexture(texKey);
-        enemy.spawn(spawnCmd.x, spawnCmd.y, spawnCmd.enemyType, spawnCmd.speed, spawnCmd.shootChance);
+        const def = getEnemyById(spawnCmd.enemyId);
+        enemy.spawn(spawnCmd.x, spawnCmd.y, def, spawnCmd.speedBase);
       }
     }
 
-    // Enemy shooting
+    // 中ボス生成チェック (波開始時に1度だけ)
+    const midBossData = this.waveManager.consumeMidBoss();
+    if (midBossData) {
+      this.spawnMidBoss(midBossData);
+    }
+
+    // 中ボス更新 + 衝突判定 (通常敵と同時に存在)
+    if (this.midBoss && this.midBoss.active) {
+      this.midBoss.update(time, delta);
+      this.playerBullets.getChildren().forEach(child => {
+        const bullet = child as Bullet;
+        if (!bullet.active || !this.midBoss || !this.midBoss.active) return;
+        const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.midBoss.x, this.midBoss.y);
+        if (dist < 28) {
+          const killed = this.midBoss.takeDamage(bullet.damage);
+          if (!bullet.isPiercing) bullet.deactivate();
+          if (killed) this.onMidBossKilled();
+        }
+      });
+      // 中ボスとプレイヤーの接触
+      if (this.player.active) {
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.midBoss.x, this.midBoss.y);
+        if (dist < 30) {
+          const dead = this.player.takeDamage(1);
+          if (dead) this.onPlayerDeath();
+        }
+      }
+    }
+
+    // Enemy shooting (interval-based, attack type pattern)
     this.enemies.getChildren().forEach(child => {
       const enemy = child as Enemy;
-      if (!enemy.active || enemy.shootChance <= 0) return;
-      if (Math.random() < enemy.shootChance) {
-        const bullet = this.enemyBullets.getFirstDead(false) as Bullet | null;
-        if (bullet) {
-          const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
-          bullet.fire(enemy.x, enemy.y, Math.cos(angle) * 200, Math.sin(angle) * 200, 1);
-        }
+      if (!enemy.active || enemy.attackInterval <= 0 || enemy.attackTypeCode === 'none') return;
+      enemy.attackTimer += delta;
+      if (enemy.attackTimer >= enemy.attackInterval) {
+        enemy.attackTimer = 0;
+        this.fireEnemyAttack(enemy);
       }
     });
 
@@ -322,23 +385,122 @@ export class GameScene extends Phaser.Scene {
       this.waveManager.totalWaves,
       this.waveManager.stageName,
       this.boss,
+      this.midBoss,
     );
     this.hud.showSkillIcons(this.runState.skills);
   }
 
-  private onEnemyKilled(enemy: Enemy): void {
-    // Explosion effect
-    this.particles.emitParticleAt(enemy.x, enemy.y, 8);
+  private fireEnemyAttack(enemy: Enemy): void {
+    const speed = 220;
+    const fire = (vx: number, vy: number) => {
+      const bullet = this.enemyBullets.getFirstDead(false) as Bullet | null;
+      if (bullet) bullet.fire(enemy.x, enemy.y, vx, vy, 1);
+    };
+    const aim = () => Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
 
-    // Drop power-ups
+    switch (enemy.attackTypeCode) {
+      case 'aimed_single': {
+        const a = aim();
+        fire(Math.cos(a) * speed, Math.sin(a) * speed);
+        break;
+      }
+      case 'aimed_burst': {
+        const a = aim();
+        for (let i = 0; i < 3; i++) {
+          this.time.delayedCall(i * 100, () => {
+            if (enemy.active) fire(Math.cos(a) * speed, Math.sin(a) * speed);
+          });
+        }
+        break;
+      }
+      case 'spread3': {
+        const base = Math.PI / 2; // straight down
+        for (const off of [-0.26, 0, 0.26]) { // ~15 degrees
+          const a = base + off;
+          fire(Math.cos(a) * speed, Math.sin(a) * speed);
+        }
+        break;
+      }
+      case 'spread5': {
+        const base = Math.PI / 2;
+        for (const off of [-0.52, -0.26, 0, 0.26, 0.52]) {
+          const a = base + off;
+          fire(Math.cos(a) * speed, Math.sin(a) * speed);
+        }
+        break;
+      }
+      case 'circle8': {
+        for (let i = 0; i < 8; i++) {
+          const a = (Math.PI * 2 * i) / 8;
+          fire(Math.cos(a) * speed, Math.sin(a) * speed);
+        }
+        break;
+      }
+    }
+  }
+
+  private onEnemyKilled(enemy: Enemy): void {
+    // Capture state before deactivating
+    const ex = enemy.x;
+    const ey = enemy.y;
+    const expValue = enemy.expValue;
+    const coinDrop = enemy.coinDrop;
+    const dropFlag = enemy.specialDropFlag;
+    const dropType = enemy.specialDropType;
+    const dropChance = enemy.specialDropChance;
+
+    // Explosion effect
+    this.particles.emitParticleAt(ex, ey, 8);
+
+    // Coin drop (occasional heal)
     const pu = this.powerUps.getFirstDead(false) as PowerUp | null;
     if (pu) {
       const type = Math.random() < 0.15 ? 'heal' : 'coin';
-      pu.spawn(enemy.x, enemy.y, type, enemy.coinDrop);
+      pu.spawn(ex, ey, type, coinDrop);
+    }
+
+    // Special drop (table-driven)
+    if (dropFlag && Math.random() < dropChance) {
+      const sp = this.powerUps.getFirstDead(false) as PowerUp | null;
+      if (sp) sp.spawnSpecial(ex, ey, dropType);
     }
 
     enemy.deactivate();
     this.waveManager.onEnemyDestroyed();
+
+    // Award EXP and trigger level-up flow
+    const levelUps = this.runState.addExp(expValue);
+    if (levelUps > 0) {
+      this.queueLevelUpSkillSelect();
+    }
+  }
+
+  private queueLevelUpSkillSelect(): void {
+    if (this.runState.pendingLevelUps <= 0) {
+      this.waveTransition = false;
+      return;
+    }
+    this.waveTransition = true;
+    const skills = this.skillManager.getRandomSkillChoices(this.runState, 3);
+    this.scene.launch('SkillSelectScene', {
+      skills,
+      title: `LEVEL UP! Lv.${this.runState.level}`,
+      onSelect: (skillId: string) => {
+        const skill = skills.find(s => s.id === skillId);
+        if (skill) {
+          this.runState.applySkill(skill);
+          if (skill.id === 'side_drone') this.player.updateDrones();
+        }
+        this.runState.pendingLevelUps = Math.max(0, this.runState.pendingLevelUps - 1);
+        this.scene.resume();
+        if (this.runState.pendingLevelUps > 0) {
+          this.queueLevelUpSkillSelect();
+        } else {
+          this.waveTransition = false;
+        }
+      },
+    });
+    this.scene.pause();
   }
 
   private onBossKilled(): void {
@@ -373,6 +535,58 @@ export class GameScene extends Phaser.Scene {
     this.waveManager.onBossDefeated();
     this.boss = null;
     this.onStageComplete();
+  }
+
+  private spawnMidBoss(data: import('../data/stages').BossData): void {
+    // 警告フラッシュ
+    this.cameras.main.flash(200, 255, 150, 0);
+    const warn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '⚠ MID BOSS ⚠', {
+      fontSize: '24px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(50);
+    this.tweens.add({
+      targets: warn, alpha: 0, duration: 1200,
+      onComplete: () => warn.destroy(),
+    });
+
+    this.midBoss = new Boss(this, this.enemyBullets);
+    this.midBoss.initAsMidBoss(data);
+  }
+
+  private onMidBossKilled(): void {
+    if (!this.midBoss) return;
+
+    // 派手な爆発
+    for (let i = 0; i < 3; i++) {
+      this.time.delayedCall(i * 80, () => {
+        if (this.midBoss) {
+          this.particles.emitParticleAt(
+            this.midBoss.x + Phaser.Math.Between(-20, 20),
+            this.midBoss.y + Phaser.Math.Between(-15, 15), 12);
+        }
+      });
+    }
+
+    // ボーナスコイン散布
+    for (let i = 0; i < 5; i++) {
+      const pu = this.powerUps.getFirstDead(false) as PowerUp | null;
+      if (pu) {
+        pu.spawn(
+          this.midBoss.x + Phaser.Math.Between(-30, 30),
+          this.midBoss.y + Phaser.Math.Between(-20, 20),
+          'coin', 3);
+      }
+    }
+
+    // 中ボス確定ドロップ（ガチャチケット）
+    const sp = this.powerUps.getFirstDead(false) as PowerUp | null;
+    if (sp) sp.spawnSpecial(this.midBoss.x, this.midBoss.y, 'gacha_ticket');
+
+    // EXP付与
+    this.runState.addExp(50);
+
+    this.midBoss.deactivate();
+    this.midBoss = null;
+    this.waveManager.onMidBossDefeated();
   }
 
   private spawnBoss(): void {

@@ -1,10 +1,12 @@
-import { GAME_HEIGHT, COLORS } from '../config';
+import { GAME_HEIGHT } from '../config';
+import { SpecialDropType, DROP_TYPES } from '../data/dropTypes';
 
-export type PowerUpType = 'coin' | 'heal';
+export type PowerUpType = 'coin' | 'heal' | 'special';
 
 export class PowerUp extends Phaser.Physics.Arcade.Sprite {
   powerUpType: PowerUpType = 'coin';
   value: number = 1;
+  specialDropType: SpecialDropType = 'none';
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
     super(scene, x, y, texture);
@@ -19,9 +21,19 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     (this.body as Phaser.Physics.Arcade.Body).enable = true;
     this.powerUpType = type;
     this.value = value;
+    this.specialDropType = 'none';
 
-    this.setTexture(type === 'coin' ? 'powerup_coin' : 'powerup_heal');
+    if (type === 'coin') this.setTexture('powerup_coin');
+    else if (type === 'heal') this.setTexture('powerup_heal');
+
     this.setVelocity(0, 80);
+  }
+
+  spawnSpecial(x: number, y: number, dropType: SpecialDropType): void {
+    this.spawn(x, y, 'special', 1);
+    this.specialDropType = dropType;
+    const def = DROP_TYPES[dropType];
+    this.setTexture(def.textureKey);
   }
 
   update(): void {

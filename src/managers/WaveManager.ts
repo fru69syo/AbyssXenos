@@ -1,12 +1,11 @@
-import { STAGES, WaveData, StageData } from '../data/stages';
+import { STAGES, WaveData, StageData, BossData } from '../data/stages';
 import { GAME_WIDTH, ENEMY } from '../config';
 
 export interface SpawnCommand {
-  enemyType: string;
+  enemyId: number;
   x: number;
   y: number;
-  speed: number;
-  shootChance: number;
+  speedBase: number;
 }
 
 export class WaveManager {
@@ -18,6 +17,8 @@ export class WaveManager {
   private waveComplete: boolean = false;
   private activeEnemies: number = 0;
   private isBossWave: boolean = false;
+  private pendingMidBoss: BossData | null = null;
+  private midBossAlive: boolean = false;
 
   constructor(stageIndex: number) {
     this.stage = STAGES[stageIndex % STAGES.length];
@@ -27,9 +28,15 @@ export class WaveManager {
   get currentWaveIndex(): number { return this.waveIndex; }
   get totalWaves(): number { return this.stage.waves.length; }
   get stageName(): string { return this.stage.name; }
-  get isWaveComplete(): boolean { return this.waveComplete && this.activeEnemies <= 0; }
   get isBoss(): boolean { return this.isBossWave; }
   get bossData() { return this.stage.boss; }
+
+  get isWaveComplete(): boolean {
+    return this.waveComplete
+      && this.activeEnemies <= 0
+      && !this.midBossAlive
+      && !this.pendingMidBoss;
+  }
 
   get isStageComplete(): boolean {
     return this.waveIndex >= this.stage.waves.length && this.isWaveComplete && !this.isBossWave;
@@ -39,10 +46,25 @@ export class WaveManager {
     this.activeEnemies = Math.max(0, this.activeEnemies - 1);
   }
 
+  /** GameScene が中ボスを生成するタイミングで呼ぶ。null なら生成不要。 */
+  consumeMidBoss(): BossData | null {
+    if (!this.pendingMidBoss) return null;
+    const data = this.pendingMidBoss;
+    this.pendingMidBoss = null;
+    this.midBossAlive = true;
+    return data;
+  }
+
+  onMidBossDefeated(): void {
+    this.midBossAlive = false;
+  }
+
   private prepareWave(): void {
     if (this.waveIndex >= this.stage.waves.length) {
       this.isBossWave = true;
       this.waveComplete = false;
+      this.pendingMidBoss = null;
+      this.midBossAlive = false;
       return;
     }
 
@@ -51,6 +73,8 @@ export class WaveManager {
     this.spawnTimer = 0;
     this.waveComplete = false;
     this.isBossWave = false;
+    this.pendingMidBoss = wave.midBoss ?? null;
+    this.midBossAlive = false;
   }
 
   private generateSpawnCommands(wave: WaveData): SpawnCommand[] {
@@ -78,11 +102,10 @@ export class WaveManager {
       }
 
       commands.push({
-        enemyType: wave.enemyType,
+        enemyId: wave.enemyId,
         x,
         y: -30,
-        speed: wave.speed,
-        shootChance: wave.shootChance ?? 0,
+        speedBase: wave.speedBase,
       });
     }
 

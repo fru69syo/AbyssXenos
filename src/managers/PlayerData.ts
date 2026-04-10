@@ -9,6 +9,7 @@ export interface PlayerSave {
   highestStage: number;
   totalRuns: number;
   gachaPity: number;
+  gachaTickets: number;
 }
 
 const DEFAULT_SAVE: PlayerSave = {
@@ -20,13 +21,27 @@ const DEFAULT_SAVE: PlayerSave = {
   highestStage: 0,
   totalRuns: 0,
   gachaPity: 0,
+  gachaTickets: 0,
 };
 
 export class PlayerData {
   data: PlayerSave;
 
   constructor() {
-    this.data = loadData<PlayerSave>('playerData') ?? { ...DEFAULT_SAVE };
+    const loaded = loadData<PlayerSave>('playerData');
+    this.data = loaded ? { ...DEFAULT_SAVE, ...loaded } : { ...DEFAULT_SAVE };
+  }
+
+  addGachaTicket(amount: number = 1): void {
+    this.data.gachaTickets += amount;
+    this.save();
+  }
+
+  spendGachaTicket(): boolean {
+    if (this.data.gachaTickets <= 0) return false;
+    this.data.gachaTickets -= 1;
+    this.save();
+    return true;
   }
 
   save(): void {

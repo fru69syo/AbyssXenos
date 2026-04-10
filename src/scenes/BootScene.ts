@@ -1,4 +1,6 @@
 import { COLORS } from '../config';
+import { ENEMIES } from '../data/enemies';
+import { DROP_TYPES } from '../data/dropTypes';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -60,11 +62,10 @@ export class BootScene extends Phaser.Scene {
     ebg.generateTexture('bullet_enemy', 8, 8);
     ebg.destroy();
 
-    // Enemies
-    this.generateEnemyTexture('enemy_drifter', COLORS.ENEMY_BASIC);
-    this.generateEnemyTexture('enemy_zigzag', COLORS.ENEMY_ZIGZAG);
-    this.generateEnemyTexture('enemy_shooter', COLORS.ENEMY_SHOOTER);
-    this.generateEnemyTexture('enemy_swarm', COLORS.ENEMY_SWARM);
+    // Enemies (data-driven from ENEMIES table)
+    for (const def of ENEMIES) {
+      this.generateEnemyTexture(def.graphic, def.color);
+    }
 
     // Boss
     const boss = this.add.graphics();
@@ -76,6 +77,19 @@ export class BootScene extends Phaser.Scene {
     boss.fillRect(10, 35, 40, 8);
     boss.generateTexture('boss', 60, 50);
     boss.destroy();
+
+    // Mid Boss (小型・橙色)
+    const mb = this.add.graphics();
+    mb.fillStyle(0xff8844, 1);
+    mb.fillRoundedRect(0, 0, 48, 40, 6);
+    mb.fillStyle(0xffcc00, 1);
+    mb.fillCircle(12, 12, 5);
+    mb.fillCircle(36, 12, 5);
+    mb.fillRect(8, 28, 32, 6);
+    mb.lineStyle(2, 0xffffff, 0.4);
+    mb.strokeRoundedRect(0, 0, 48, 40, 6);
+    mb.generateTexture('midboss', 48, 40);
+    mb.destroy();
 
     // PowerUp coin
     const cg = this.add.graphics();
@@ -96,6 +110,11 @@ export class BootScene extends Phaser.Scene {
     hg.generateTexture('powerup_heal', 12, 12);
     hg.destroy();
 
+    // Special drops (gacha ticket / gem / rare part)
+    this.generateDropTexture('drop_gacha_ticket', DROP_TYPES.gacha_ticket.color, 'ticket');
+    this.generateDropTexture('drop_gem', DROP_TYPES.gem.color, 'gem');
+    this.generateDropTexture('drop_rare_part', DROP_TYPES.rare_part.color, 'part');
+
     // Explosion particle
     const exp = this.add.graphics();
     exp.fillStyle(0xffffff, 1);
@@ -111,6 +130,33 @@ export class BootScene extends Phaser.Scene {
     g.lineStyle(1, 0xffffff, 0.3);
     g.strokeTriangle(12, 24, 0, 0, 24, 0);
     g.generateTexture(key, 24, 24);
+    g.destroy();
+  }
+
+  private generateDropTexture(key: string, color: number, shape: 'ticket' | 'gem' | 'part'): void {
+    const g = this.add.graphics();
+    g.fillStyle(color, 1);
+    if (shape === 'ticket') {
+      // Ticket: rounded rectangle
+      g.fillRoundedRect(1, 3, 14, 10, 2);
+      g.lineStyle(1, 0xffffff, 0.6);
+      g.strokeRoundedRect(1, 3, 14, 10, 2);
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(8, 8, 1.5);
+    } else if (shape === 'gem') {
+      // Gem: diamond
+      g.fillTriangle(8, 1, 1, 8, 15, 8);
+      g.fillTriangle(1, 8, 15, 8, 8, 15);
+      g.lineStyle(1, 0xffffff, 0.7);
+      g.strokeTriangle(8, 1, 1, 8, 15, 8);
+      g.strokeTriangle(1, 8, 15, 8, 8, 15);
+    } else {
+      // Part: hexagon
+      g.fillCircle(8, 8, 6);
+      g.lineStyle(1, 0xffffff, 0.6);
+      g.strokeCircle(8, 8, 6);
+    }
+    g.generateTexture(key, 16, 16);
     g.destroy();
   }
 }

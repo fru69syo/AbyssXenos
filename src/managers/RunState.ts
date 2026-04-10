@@ -31,6 +31,10 @@ export class RunState {
   drones: number;
   regenPerWave: number;
   bulletSizeMultiplier: number;
+  exp: number;
+  level: number;
+  expToNextLevel: number;
+  pendingLevelUps: number;
 
   constructor(baseHp: number, baseAtk: number, baseSpeed: number, baseFireRate: number) {
     this.hp = baseHp;
@@ -58,6 +62,28 @@ export class RunState {
     this.drones = 0;
     this.regenPerWave = 0;
     this.bulletSizeMultiplier = 1;
+    this.exp = 0;
+    this.level = 1;
+    this.expToNextLevel = this.calcExpForLevel(2);
+    this.pendingLevelUps = 0;
+  }
+
+  /** Returns number of level-ups triggered. */
+  addExp(amount: number): number {
+    this.exp += amount;
+    let levelUps = 0;
+    while (this.exp >= this.expToNextLevel) {
+      this.exp -= this.expToNextLevel;
+      this.level++;
+      levelUps++;
+      this.expToNextLevel = this.calcExpForLevel(this.level + 1);
+    }
+    this.pendingLevelUps += levelUps;
+    return levelUps;
+  }
+
+  private calcExpForLevel(lv: number): number {
+    return 30 + (lv - 2) * 20; // Lv2:30, Lv3:50, Lv4:70, ...
   }
 
   applySkill(skill: SkillDef): void {

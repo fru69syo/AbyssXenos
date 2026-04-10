@@ -31,8 +31,30 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.patterns = data.attackPatterns;
     this.patternIndex = 0;
     this.patternTimer = 0;
+    this.patternInterval = 2000;
     this.entering = true;
+    this.targetY = 100;
+    this.setTexture('boss');
+    this.setScale(1);
     this.setPosition(GAME_WIDTH / 2, -60);
+    this.setActive(true);
+    this.setVisible(true);
+    (this.body as Phaser.Physics.Arcade.Body).enable = true;
+  }
+
+  initAsMidBoss(data: BossData): void {
+    this.hp = data.hp;
+    this.maxHp = data.hp;
+    this.moveSpeed = data.speed;
+    this.patterns = data.attackPatterns;
+    this.patternIndex = 0;
+    this.patternTimer = 0;
+    this.patternInterval = 1800;
+    this.entering = true;
+    this.targetY = 80;
+    this.setTexture('midboss');
+    this.setScale(0.85);
+    this.setPosition(GAME_WIDTH / 2, -40);
     this.setActive(true);
     this.setVisible(true);
     (this.body as Phaser.Physics.Arcade.Body).enable = true;

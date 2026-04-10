@@ -1,9 +1,9 @@
 export interface WaveData {
-  enemyType: 'drifter' | 'zigzag' | 'shooter' | 'swarm';
+  enemyId: number;            // 敵テーブルのID参照
   count: number;
   formation: 'line' | 'v' | 'random';
-  speed: number;
-  shootChance?: number;
+  speedBase: number;          // 基本速度 (敵側 speedMul と乗算)
+  midBoss?: BossData;         // この波に中ボスを併発する場合
 }
 
 export interface BossData {
@@ -15,68 +15,91 @@ export interface BossData {
 export interface StageData {
   id: number;
   name: string;
-  waves: WaveData[];
-  boss: BossData;
+  waves: WaveData[];          // 4波: 通常→通常→中ボス+通常→通常
+  boss: BossData;             // 最終ボス
 }
 
 export const STAGES: StageData[] = [
+  // ======== ステージ1: 深海入口 ========
   {
     id: 1,
     name: '深海入口',
     waves: [
-      { enemyType: 'drifter', count: 6, formation: 'line', speed: 100 },
-      { enemyType: 'drifter', count: 8, formation: 'random', speed: 110 },
-      { enemyType: 'zigzag', count: 5, formation: 'random', speed: 90 },
-      { enemyType: 'drifter', count: 10, formation: 'v', speed: 120 },
-      { enemyType: 'zigzag', count: 7, formation: 'line', speed: 100 },
+      // wave1: 通常敵
+      { enemyId: 1, count: 6, formation: 'line', speedBase: 100 },
+      // wave2: 通常敵
+      { enemyId: 2, count: 6, formation: 'random', speedBase: 110 },
+      // wave3: 中ボス + 通常敵
+      {
+        enemyId: 1, count: 5, formation: 'random', speedBase: 110,
+        midBoss: { hp: 15, speed: 50, attackPatterns: ['aimed'] },
+      },
+      // wave4: 通常敵
+      { enemyId: 2, count: 8, formation: 'v', speedBase: 120 },
     ],
     boss: { hp: 30, speed: 60, attackPatterns: ['spread'] },
   },
+
+  // ======== ステージ2: 暗黒海溝 ========
   {
     id: 2,
     name: '暗黒海溝',
     waves: [
-      { enemyType: 'zigzag', count: 8, formation: 'random', speed: 110 },
-      { enemyType: 'shooter', count: 4, formation: 'line', speed: 80, shootChance: 0.02 },
-      { enemyType: 'drifter', count: 12, formation: 'v', speed: 130 },
-      { enemyType: 'shooter', count: 6, formation: 'random', speed: 90, shootChance: 0.03 },
-      { enemyType: 'swarm', count: 15, formation: 'random', speed: 150 },
+      { enemyId: 2, count: 8, formation: 'random', speedBase: 110 },
+      { enemyId: 3, count: 5, formation: 'line', speedBase: 130 },
+      {
+        enemyId: 4, count: 10, formation: 'random', speedBase: 130,
+        midBoss: { hp: 25, speed: 55, attackPatterns: ['spread', 'aimed'] },
+      },
+      { enemyId: 6, count: 3, formation: 'random', speedBase: 140 },
     ],
     boss: { hp: 50, speed: 70, attackPatterns: ['spread', 'aimed'] },
   },
+
+  // ======== ステージ3: 異界の裂け目 ========
   {
     id: 3,
     name: '異界の裂け目',
     waves: [
-      { enemyType: 'shooter', count: 6, formation: 'line', speed: 100, shootChance: 0.03 },
-      { enemyType: 'swarm', count: 18, formation: 'random', speed: 160 },
-      { enemyType: 'zigzag', count: 10, formation: 'v', speed: 120 },
-      { enemyType: 'shooter', count: 8, formation: 'random', speed: 110, shootChance: 0.04 },
-      { enemyType: 'swarm', count: 20, formation: 'line', speed: 170 },
+      { enemyId: 3, count: 6, formation: 'line', speedBase: 140 },
+      { enemyId: 4, count: 15, formation: 'random', speedBase: 160 },
+      {
+        enemyId: 2, count: 8, formation: 'v', speedBase: 130,
+        midBoss: { hp: 40, speed: 60, attackPatterns: ['spread', 'spiral'] },
+      },
+      { enemyId: 5, count: 4, formation: 'random', speedBase: 150 },
     ],
     boss: { hp: 80, speed: 80, attackPatterns: ['spread', 'aimed', 'spiral'] },
   },
+
+  // ======== ステージ4: ゼノスの巣窟 ========
   {
     id: 4,
     name: 'ゼノスの巣窟',
     waves: [
-      { enemyType: 'swarm', count: 20, formation: 'random', speed: 170 },
-      { enemyType: 'shooter', count: 8, formation: 'v', speed: 120, shootChance: 0.04 },
-      { enemyType: 'zigzag', count: 12, formation: 'line', speed: 140 },
-      { enemyType: 'shooter', count: 10, formation: 'random', speed: 130, shootChance: 0.05 },
-      { enemyType: 'swarm', count: 25, formation: 'v', speed: 180 },
+      { enemyId: 4, count: 18, formation: 'random', speedBase: 170 },
+      { enemyId: 5, count: 5, formation: 'v', speedBase: 140 },
+      {
+        enemyId: 6, count: 4, formation: 'random', speedBase: 150,
+        midBoss: { hp: 60, speed: 70, attackPatterns: ['aimed', 'spiral', 'spread'] },
+      },
+      { enemyId: 4, count: 22, formation: 'v', speedBase: 180 },
     ],
     boss: { hp: 120, speed: 90, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
+
+  // ======== ステージ5: アビス・コア ========
   {
     id: 5,
     name: 'アビス・コア',
     waves: [
-      { enemyType: 'shooter', count: 10, formation: 'line', speed: 140, shootChance: 0.05 },
-      { enemyType: 'swarm', count: 30, formation: 'random', speed: 190 },
-      { enemyType: 'zigzag', count: 15, formation: 'v', speed: 150 },
-      { enemyType: 'shooter', count: 12, formation: 'v', speed: 150, shootChance: 0.06 },
-      { enemyType: 'swarm', count: 35, formation: 'random', speed: 200 },
+      { enemyId: 5, count: 6, formation: 'line', speedBase: 150 },
+      { enemyId: 4, count: 25, formation: 'random', speedBase: 190 },
+      {
+        enemyId: 7, count: 3, formation: 'v', speedBase: 140,
+        midBoss: { hp: 90, speed: 80, attackPatterns: ['spread', 'aimed', 'spiral'] },
+      },
+      { enemyId: 5, count: 8, formation: 'random', speedBase: 170 },
     ],
     boss: { hp: 180, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },

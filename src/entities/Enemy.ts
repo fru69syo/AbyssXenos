@@ -1,15 +1,24 @@
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
+import { GAME_HEIGHT } from '../config';
+import { EnemyDef, MoveTypeCode, AttackTypeCode } from '../data/enemies';
+import { SpecialDropType } from '../data/dropTypes';
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
+  def!: EnemyDef;
   hp: number = 1;
   maxHp: number = 1;
   moveSpeed: number = 100;
-  scoreValue: number = 10;
+  expValue: number = 0;
   coinDrop: number = 1;
-  shootChance: number = 0;
-  movePattern: 'drifter' | 'zigzag' | 'shooter' | 'swarm' = 'drifter';
+  movePattern: MoveTypeCode = 'straight';
+  attackTypeCode: AttackTypeCode = 'none';
+  attackInterval: number = 0;
+  attackTimer: number = 0;
+  specialDropFlag: boolean = false;
+  specialDropType: SpecialDropType = 'none';
+  specialDropChance: number = 0;
   private zigzagTimer: number = 0;
   private zigzagDir: number = 1;
+  private sineSeed: number = 0;
   private frozen: boolean = false;
   private frozenTimer: number = 0;
   private burning: boolean = false;
@@ -23,27 +32,35 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setData('isEnemy', true);
   }
 
-  spawn(x: number, y: number, type: string, speed: number, shootChance: number): void {
+  spawn(x: number, y: number, def: EnemyDef, speedBase: number): void {
     this.setPosition(x, y);
     this.setActive(true);
     this.setVisible(true);
     (this.body as Phaser.Physics.Arcade.Body).enable = true;
-    this.moveSpeed = speed;
-    this.shootChance = shootChance;
-    this.movePattern = type as typeof this.movePattern;
+
+    this.def = def;
+    this.hp = def.hp;
+    this.maxHp = def.hp;
+    this.moveSpeed = speedBase * def.speedMul;
+    this.expValue = def.exp;
+    this.coinDrop = def.coin;
+    this.movePattern = def.moveType;
+    this.attackTypeCode = def.attackType;
+    this.attackInterval = def.attackInterval;
+    this.attackTimer = 0;
+    this.specialDropFlag = def.specialDropFlag;
+    this.specialDropType = def.specialDropType;
+    this.specialDropChance = def.specialDropChance;
+
+    this.setTexture(def.graphic);
+    this.setScale(def.scale);
+    this.clearTint();
+
     this.frozen = false;
     this.burning = false;
     this.zigzagTimer = 0;
     this.zigzagDir = Math.random() > 0.5 ? 1 : -1;
-
-    switch (type) {
-      case 'drifter': this.hp = 2; this.scoreValue = 10; this.coinDrop = 1; break;
-      case 'zigzag': this.hp = 3; this.scoreValue = 15; this.coinDrop = 1; break;
-      case 'shooter': this.hp = 4; this.scoreValue = 25; this.coinDrop = 2; break;
-      case 'swarm': this.hp = 1; this.scoreValue = 5; this.coinDrop = 1; break;
-    }
-    this.maxHp = this.hp;
-    this.setScale(type === 'swarm' ? 0.7 : 1);
+    this.sineSeed = Math.random() * Math.PI * 2;
   }
 
   update(_time: number, delta: number): void {
@@ -74,7 +91,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     // Movement
     switch (this.movePattern) {
-      case 'drifter':
+      case 'straight':
         this.setVelocity(0, this.moveSpeed);
         break;
       case 'zigzag':
@@ -85,8 +102,14 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         }
         this.setVelocity(this.zigzagDir * this.moveSpeed * 0.6, this.moveSpeed * 0.8);
         break;
-      case 'shooter':
-        this.setVelocity(0, this.moveSpeed * 0.6);
+      case 'sine':
+        this.setVelocity(
+          Math.sin(Date.now() * 0.002 + this.sineSeed) * this.moveSpeed * 0.7,
+          this.moveSpeed * 0.85
+        );
+        break;
+      case 'slow_descent':
+        this.setVelocity(0, this.moveSpeed);
         break;
       case 'swarm':
         this.setVelocity(
