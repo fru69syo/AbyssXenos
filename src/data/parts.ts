@@ -69,6 +69,11 @@ export function parsePartKey(key: string): { lineId: string; rarity: PartRarity 
 
 // ====== パーツライン定義 (進化系統) ======
 
+export interface BonusAbility {
+  id: string;
+  desc: string;
+}
+
 export interface PartLineDef {
   id: string;
   slot: PartSlot;
@@ -77,9 +82,15 @@ export interface PartLineDef {
   atk: number;        // N基準のベースATK
   speed: number;      // N基準のベース移動速度
   fireRate: number;   // メインウェポン専用 (0=影響なし)
-  ability: string;    // 特殊能力キー (空文字=なし)
+  ability: string;    // 基本能力キー (全レアリティ共通, 空文字=なし)
   abilityDesc: string;
   color: number;
+  /** SR/UR/LRで追加解放される能力 */
+  bonusAbilities?: {
+    sr?: BonusAbility;
+    ur?: BonusAbility;
+    lr?: BonusAbility;
+  };
 }
 
 export const PART_LINES: PartLineDef[] = [
