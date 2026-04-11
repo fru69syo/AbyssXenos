@@ -5,7 +5,7 @@ import {
   getPartLineById, calcPartStats, parsePartKey, partKey,
   PART_RARITY_COLORS, PART_RARITY_LABELS, PART_RARITY_BG,
   RARITY_BONUS, RARITY_FIRERATE_BONUS,
-  EVOLUTION_COST, NEXT_RARITY,
+  EVOLUTION_COST, NEXT_RARITY, PART_RARITY_ORDER,
 } from '../data/parts';
 import { UPGRADES } from '../data/upgrades';
 
@@ -135,7 +135,7 @@ export class LobbyScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(11);
     this.popupContainer.push(title);
 
-    const cardHeight = 65;
+    const cardHeight = 95;
     const gap = 6;
     const startY = 115;
 
@@ -156,7 +156,7 @@ export class LobbyScene extends Phaser.Scene {
       // Rarity + name
       const rLabel = PART_RARITY_LABELS[item.rarity];
       const partName = line.names[item.rarity];
-      const nameText = this.add.text(22, y + 6, `[${rLabel}] ${partName}`, {
+      const nameText = this.add.text(22, y + 4, `[${rLabel}] ${partName}`, {
         fontSize: '13px', color, fontFamily: 'monospace', fontStyle: 'bold',
       }).setDepth(12);
       this.popupContainer.push(nameText);
@@ -168,7 +168,7 @@ export class LobbyScene extends Phaser.Scene {
       if (nextRarity) {
         countStr += ` (${item.count}/${EVOLUTION_COST})`;
       }
-      const countText = this.add.text(22, y + 24, countStr, {
+      const countText = this.add.text(22, y + 20, countStr, {
         fontSize: '10px', color: canEvolve ? '#00ff88' : '#888888', fontFamily: 'monospace',
       }).setDepth(12);
       this.popupContainer.push(countText);
@@ -182,22 +182,46 @@ export class LobbyScene extends Phaser.Scene {
       if (line.fireRate > 0) {
         statsStr += ` FR:${line.fireRate - RARITY_FIRERATE_BONUS[item.rarity]}ms`;
       }
-      const statsText = this.add.text(22, y + 38, statsStr, {
+      const statsText = this.add.text(22, y + 33, statsStr, {
         fontSize: '9px', color: '#777777', fontFamily: 'monospace',
       }).setDepth(12);
       this.popupContainer.push(statsText);
 
       // Ability
+      let abilY = y + 46;
       if (line.abilityDesc) {
-        const abilText = this.add.text(22, y + 50, line.abilityDesc, {
+        const abilText = this.add.text(22, abilY, line.abilityDesc, {
           fontSize: '9px', color: '#aaaacc', fontFamily: 'monospace',
         }).setDepth(12);
         this.popupContainer.push(abilText);
+        abilY += 12;
+      }
+
+      // Bonus abilities (SR/UR/LR)
+      if (line.bonusAbilities) {
+        const ri = PART_RARITY_ORDER.indexOf(item.rarity);
+        const tiers: { key: 'sr' | 'ur' | 'lr'; label: string; minRi: number }[] = [
+          { key: 'sr', label: 'SR', minRi: 2 },
+          { key: 'ur', label: 'UR', minRi: 3 },
+          { key: 'lr', label: 'LR', minRi: 4 },
+        ];
+        for (const tier of tiers) {
+          const ba = line.bonusAbilities[tier.key];
+          if (!ba) continue;
+          const unlocked = ri >= tier.minRi;
+          const tierColor = unlocked ? PART_RARITY_COLORS[tier.key] : '#444444';
+          const prefix = unlocked ? '✦' : '🔒';
+          const baText = this.add.text(22, abilY, `${prefix}${tier.label}: ${ba.desc}`, {
+            fontSize: '8px', color: tierColor, fontFamily: 'monospace',
+          }).setDepth(12);
+          this.popupContainer.push(baText);
+          abilY += 11;
+        }
       }
 
       // Right side: equip marker or evolve button
       if (isEquipped) {
-        const eqMark = this.add.text(GAME_WIDTH - 22, y + 10, '装備中', {
+        const eqMark = this.add.text(GAME_WIDTH - 22, y + 8, '装備中', {
           fontSize: '11px', color: '#00ff88', fontFamily: 'monospace',
         }).setOrigin(1, 0).setDepth(12);
         this.popupContainer.push(eqMark);
@@ -205,7 +229,7 @@ export class LobbyScene extends Phaser.Scene {
 
       // Evolve button
       if (canEvolve && nextRarity) {
-        const evolveBtn = this.add.text(GAME_WIDTH - 22, y + 36, `進化→${PART_RARITY_LABELS[nextRarity]}`, {
+        const evolveBtn = this.add.text(GAME_WIDTH - 22, y + 30, `進化→${PART_RARITY_LABELS[nextRarity]}`, {
           fontSize: '11px', color: '#000000', fontFamily: 'monospace', fontStyle: 'bold',
           backgroundColor: '#00ff88', padding: { x: 6, y: 3 },
         }).setOrigin(1, 0).setDepth(13).setInteractive();

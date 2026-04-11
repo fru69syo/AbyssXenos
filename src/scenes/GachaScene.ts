@@ -4,7 +4,7 @@ import { GachaManager, GachaResult } from '../managers/GachaManager';
 import {
   PartRarity, PART_RARITY_COLORS, PART_RARITY_LABELS, PART_RARITY_BG,
   PART_SLOT_LABELS, PART_SLOT_ICONS, RARITY_BONUS, RARITY_FIRERATE_BONUS,
-  EVOLUTION_COST, NEXT_RARITY,
+  EVOLUTION_COST, NEXT_RARITY, PART_RARITY_ORDER,
 } from '../data/parts';
 
 export class GachaScene extends Phaser.Scene {
@@ -140,8 +140,8 @@ export class GachaScene extends Phaser.Scene {
       this.cameras.main.flash(200, 80, 120, 255);
     }
 
-    // Card
-    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 80, 230, bgColor)
+    // Card (taller to fit bonus abilities)
+    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 80, 280, bgColor)
       .setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(color).color);
     this.resultContainer.push(card);
 
@@ -207,11 +207,35 @@ export class GachaScene extends Phaser.Scene {
     this.resultContainer.push(statsText);
 
     // Ability
+    let nextY = centerY + 99;
     if (line.abilityDesc) {
-      const abilityText = this.add.text(GAME_WIDTH / 2, centerY + 99, line.abilityDesc, {
+      const abilityText = this.add.text(GAME_WIDTH / 2, nextY, line.abilityDesc, {
         fontSize: '12px', color, fontFamily: 'monospace',
       }).setOrigin(0.5);
       this.resultContainer.push(abilityText);
+      nextY += 16;
+    }
+
+    // Bonus abilities (SR/UR/LR)
+    if (line.bonusAbilities) {
+      const ri = PART_RARITY_ORDER.indexOf(rarity);
+      const tiers: { key: 'sr' | 'ur' | 'lr'; label: string; minRi: number }[] = [
+        { key: 'sr', label: 'SR', minRi: 2 },
+        { key: 'ur', label: 'UR', minRi: 3 },
+        { key: 'lr', label: 'LR', minRi: 4 },
+      ];
+      for (const tier of tiers) {
+        const ba = line.bonusAbilities[tier.key];
+        if (!ba) continue;
+        const unlocked = ri >= tier.minRi;
+        const tierColor = unlocked ? PART_RARITY_COLORS[tier.key] : '#444444';
+        const prefix = unlocked ? '✦' : '🔒';
+        const baText = this.add.text(GAME_WIDTH / 2, nextY, `${prefix} ${tier.label}: ${ba.desc}`, {
+          fontSize: '10px', color: tierColor, fontFamily: 'monospace',
+        }).setOrigin(0.5);
+        this.resultContainer.push(baText);
+        nextY += 14;
+      }
     }
 
     // Entry animation
