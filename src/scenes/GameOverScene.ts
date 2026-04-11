@@ -70,10 +70,7 @@ export class GameOverScene extends Phaser.Scene {
     }).setOrigin(0.5).setInteractive();
 
     retryBtn.on('pointerdown', () => {
-      this.scene.start('GameScene', {
-        playerData,
-        shipId: playerData.data.selectedShip,
-      });
+      this.scene.start('GameScene', { playerData });
     });
 
     this.tweens.add({

@@ -8,7 +8,7 @@ import { RunState } from '../managers/RunState';
 import { SkillManager } from '../managers/SkillManager';
 import { WaveManager } from '../managers/WaveManager';
 import { PlayerData } from '../managers/PlayerData';
-import { SHIPS } from '../data/ships';
+import { calcPartStats, PartSlot } from '../data/parts';
 import { UPGRADES } from '../data/upgrades';
 import { getEnemyById } from '../data/enemies';
 import { HUD } from '../ui/HUD';
@@ -37,9 +37,10 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  init(data: { playerData: PlayerData; shipId: string }): void {
+  init(data: { playerData: PlayerData }): void {
     this.playerData = data.playerData;
-    const ship = SHIPS.find(s => s.id === data.shipId) ?? SHIPS[0];
+    const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
+    const stats = calcPartStats(equipped);
 
     // Apply permanent upgrades
     let bonusHp = 0, bonusAtk = 0, bonusSpeed = 0;
@@ -55,10 +56,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.runState = new RunState(
-      ship.baseHp + bonusHp,
-      ship.baseAtk + bonusAtk,
-      ship.baseSpeed + bonusSpeed,
-      ship.fireRate,
+      stats.hp + bonusHp,
+      stats.atk + bonusAtk,
+      stats.speed + bonusSpeed,
+      stats.fireRate,
     );
 
     // Apply coin rate upgrade

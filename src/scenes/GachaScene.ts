@@ -1,7 +1,10 @@
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { PlayerData } from '../managers/PlayerData';
 import { GachaManager, GachaResult } from '../managers/GachaManager';
-import { ShipRarity } from '../data/ships';
+import {
+  PartRarity, PART_RARITY_COLORS, PART_RARITY_LABELS, PART_RARITY_BG,
+  PART_SLOT_LABELS, PART_SLOT_ICONS,
+} from '../data/parts';
 
 export class GachaScene extends Phaser.Scene {
   private playerData!: PlayerData;
@@ -48,7 +51,7 @@ export class GachaScene extends Phaser.Scene {
 
   private createUI(): void {
     // Title
-    this.add.text(GAME_WIDTH / 2, 40, '🎰 機体ガチャ', {
+    this.add.text(GAME_WIDTH / 2, 40, '🎰 パーツガチャ', {
       fontSize: '28px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
 
@@ -63,11 +66,11 @@ export class GachaScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Rates info
-    this.add.text(GAME_WIDTH / 2, 140, '排出率: N 60% | R 30% | SR 8% | SSR 2%', {
-      fontSize: '11px', color: '#666666', fontFamily: 'monospace',
+    this.add.text(GAME_WIDTH / 2, 135, 'N50 R30 SR12 SSR5 UR2.5 LR0.5', {
+      fontSize: '10px', color: '#666666', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, 158, '50回で SR以上確定', {
+    this.add.text(GAME_WIDTH / 2, 153, '50回で SR以上確定', {
       fontSize: '11px', color: '#886644', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
@@ -99,7 +102,6 @@ export class GachaScene extends Phaser.Scene {
     }).setOrigin(0.5).setInteractive();
 
     adPullBtn.on('pointerdown', () => {
-      // Simulate watching ad, then give free gems and pull
       this.playerData.addGems(this.gachaManager.getCost());
       this.updateGemDisplay();
       this.doPull();
@@ -128,67 +130,82 @@ export class GachaScene extends Phaser.Scene {
   }
 
   private showGachaResult(result: GachaResult): void {
-    const rarityColors: Record<ShipRarity, string> = {
-      n: '#aaaaaa', r: '#4488ff', sr: '#ff44ff', ssr: '#ffaa00',
-    };
-    const rarityLabels: Record<ShipRarity, string> = {
-      n: 'NORMAL', r: 'RARE', sr: 'SUPER RARE', ssr: 'SSR !!!',
-    };
-    const rarityBgColors: Record<ShipRarity, number> = {
-      n: 0x222233, r: 0x112255, sr: 0x331155, ssr: 0x443300,
-    };
+    const rarity = result.part.rarity;
+    const color = PART_RARITY_COLORS[rarity];
+    const bgColor = PART_RARITY_BG[rarity];
+    const label = PART_RARITY_LABELS[rarity];
+    const slotIcon = PART_SLOT_ICONS[result.part.slot];
+    const slotLabel = PART_SLOT_LABELS[result.part.slot];
 
     const centerY = GAME_HEIGHT * 0.45;
 
     // Flash for high rarity
-    if (result.ship.rarity === 'ssr') {
+    if (rarity === 'ur' || rarity === 'lr') {
+      this.cameras.main.flash(600, 255, 100, 100);
+    } else if (rarity === 'ssr') {
       this.cameras.main.flash(500, 255, 200, 0);
-    } else if (result.ship.rarity === 'sr') {
+    } else if (rarity === 'sr') {
       this.cameras.main.flash(300, 200, 100, 255);
     }
 
     // Card
-    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 80, 200, rarityBgColors[result.ship.rarity])
-      .setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(rarityColors[result.ship.rarity]).color);
+    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 80, 220, bgColor)
+      .setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(color).color);
     this.resultContainer.push(card);
 
-    // Rarity
-    const rarityText = this.add.text(GAME_WIDTH / 2, centerY - 70, rarityLabels[result.ship.rarity], {
-      fontSize: '22px', color: rarityColors[result.ship.rarity], fontFamily: 'monospace', fontStyle: 'bold',
+    // Rarity label
+    const rarityText = this.add.text(GAME_WIDTH / 2, centerY - 85, label, {
+      fontSize: '22px', color, fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.resultContainer.push(rarityText);
 
-    // Ship icon
-    const icon = this.add.text(GAME_WIDTH / 2, centerY - 20, '▲', {
-      fontSize: '48px', color: '#' + result.ship.color.toString(16).padStart(6, '0'),
+    // Slot icon + label
+    const slotText = this.add.text(GAME_WIDTH / 2, centerY - 58, `${slotIcon} ${slotLabel}`, {
+      fontSize: '14px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    this.resultContainer.push(slotText);
+
+    // Part icon (large slot icon with part color)
+    const icon = this.add.text(GAME_WIDTH / 2, centerY - 20, slotIcon, {
+      fontSize: '48px', color: '#' + result.part.color.toString(16).padStart(6, '0'),
     }).setOrigin(0.5);
     this.resultContainer.push(icon);
 
-    // Ship name
-    const nameText = this.add.text(GAME_WIDTH / 2, centerY + 30, result.ship.name, {
+    // Part name
+    const nameText = this.add.text(GAME_WIDTH / 2, centerY + 25, result.part.name, {
       fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.resultContainer.push(nameText);
 
     // NEW / duplicate
     if (result.isNew) {
-      const newLabel = this.add.text(GAME_WIDTH / 2, centerY + 60, '✨ NEW! ✨', {
+      const newLabel = this.add.text(GAME_WIDTH / 2, centerY + 55, '✨ NEW! ✨', {
         fontSize: '24px', color: '#00ff88', fontFamily: 'monospace', fontStyle: 'bold',
       }).setOrigin(0.5);
       this.resultContainer.push(newLabel);
       this.tweens.add({ targets: newLabel, scaleX: 1.2, scaleY: 1.2, duration: 400, yoyo: true, repeat: 2 });
     } else {
-      const dupLabel = this.add.text(GAME_WIDTH / 2, centerY + 60, `重複 → 🪙${result.coinRefund}に変換`, {
+      const dupLabel = this.add.text(GAME_WIDTH / 2, centerY + 55, `重複 → 🪙${result.coinRefund}に変換`, {
         fontSize: '16px', color: '#aaaaaa', fontFamily: 'monospace',
       }).setOrigin(0.5);
       this.resultContainer.push(dupLabel);
     }
 
     // Stats
-    const stats = this.add.text(GAME_WIDTH / 2, centerY + 85, `HP:${result.ship.baseHp} ATK:${result.ship.baseAtk} SPD:${result.ship.baseSpeed}`, {
+    let statsStr = `HP:${result.part.hp} ATK:${result.part.atk} SPD:${result.part.speed}`;
+    if (result.part.fireRate > 0) statsStr += ` FR:${result.part.fireRate}ms`;
+    const statsText = this.add.text(GAME_WIDTH / 2, centerY + 80, statsStr, {
       fontSize: '12px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
-    this.resultContainer.push(stats);
+    this.resultContainer.push(statsText);
+
+    // Ability description
+    if (result.part.abilityDesc) {
+      const abilityText = this.add.text(GAME_WIDTH / 2, centerY + 97, result.part.abilityDesc, {
+        fontSize: '12px', color, fontFamily: 'monospace',
+      }).setOrigin(0.5);
+      this.resultContainer.push(abilityText);
+    }
 
     // Entry animation
     card.setScale(0);

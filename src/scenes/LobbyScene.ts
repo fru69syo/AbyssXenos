@@ -1,16 +1,19 @@
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { PlayerData } from '../managers/PlayerData';
-import { SHIPS, ShipDef } from '../data/ships';
-import { UPGRADES, UpgradeDef } from '../data/upgrades';
+import {
+  PartSlot, PART_SLOTS, PART_SLOT_LABELS, PART_SLOT_ICONS,
+  getPartById, getPartsBySlot, calcPartStats,
+  PART_RARITY_COLORS, PART_RARITY_LABELS, PRESETS,
+} from '../data/parts';
+import { UPGRADES } from '../data/upgrades';
 
 export class LobbyScene extends Phaser.Scene {
   private playerData!: PlayerData;
-  private selectedShipIndex: number = 0;
-  private shipPreview!: Phaser.GameObjects.Text;
-  private shipName!: Phaser.GameObjects.Text;
-  private shipStats!: Phaser.GameObjects.Text;
   private coinText!: Phaser.GameObjects.Text;
   private gemText!: Phaser.GameObjects.Text;
+  private slotTexts: Phaser.GameObjects.Text[] = [];
+  private statsText!: Phaser.GameObjects.Text;
+  private partSelectContainer: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super('LobbyScene');
@@ -20,7 +23,7 @@ export class LobbyScene extends Phaser.Scene {
     this.playerData = new PlayerData();
     this.createBackground();
     this.createCurrencyDisplay();
-    this.createShipSelector();
+    this.createPartsDisplay();
     this.createUpgradePanel();
     this.createButtons();
   }
@@ -49,64 +52,144 @@ export class LobbyScene extends Phaser.Scene {
     }).setOrigin(0.5, 0);
   }
 
-  private createShipSelector(): void {
-    this.add.text(GAME_WIDTH / 2, 70, '— 機体選択 —', {
+  private createPartsDisplay(): void {
+    this.add.text(GAME_WIDTH / 2, 60, '— パーツ装備 —', {
       fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    // Ship preview area
-    const ownedShips = SHIPS.filter(s => this.playerData.data.ownedShips.includes(s.id));
-    this.selectedShipIndex = ownedShips.findIndex(s => s.id === this.playerData.data.selectedShip);
-    if (this.selectedShipIndex < 0) this.selectedShipIndex = 0;
+    const startY = 85;
+    const rowHeight = 28;
 
-    this.shipPreview = this.add.text(GAME_WIDTH / 2, 130, '▲', {
-      fontSize: '48px', color: '#00ccff', fontFamily: 'monospace',
-    }).setOrigin(0.5);
+    PART_SLOTS.forEach((slot, i) => {
+      const y = startY + i * rowHeight;
 
-    this.shipName = this.add.text(GAME_WIDTH / 2, 170, '', {
-      fontSize: '18px', color: '#ffffff', fontFamily: 'monospace',
-    }).setOrigin(0.5);
+      // Slot icon
+      this.add.text(15, y, PART_SLOT_ICONS[slot], {
+        fontSize: '14px', color: '#888888', fontFamily: 'monospace',
+      });
 
-    this.shipStats = this.add.text(GAME_WIDTH / 2, 195, '', {
-      fontSize: '13px', color: '#aaaaaa', fontFamily: 'monospace', align: 'center',
+      // Slot label
+      this.add.text(32, y, PART_SLOT_LABELS[slot], {
+        fontSize: '11px', color: '#666666', fontFamily: 'monospace',
+      });
+
+      // Part name (interactive, updates on equip)
+      const partText = this.add.text(110, y, '', {
+        fontSize: '13px', color: '#ffffff', fontFamily: 'monospace',
+      }).setInteractive();
+
+      partText.on('pointerdown', () => this.openPartSelect(slot));
+      this.slotTexts.push(partText);
+    });
+
+    // Stats summary
+    this.statsText = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 8, '', {
+      fontSize: '12px', color: '#aaaaaa', fontFamily: 'monospace', align: 'center',
     }).setOrigin(0.5, 0);
 
-    // Left/Right arrows
-    const leftBtn = this.add.text(40, 130, '◀', {
-      fontSize: '32px', color: '#ffffff', fontFamily: 'monospace',
-    }).setOrigin(0.5).setInteractive();
-    leftBtn.on('pointerdown', () => {
-      this.selectedShipIndex = (this.selectedShipIndex - 1 + ownedShips.length) % ownedShips.length;
-      this.updateShipDisplay(ownedShips);
-    });
-
-    const rightBtn = this.add.text(GAME_WIDTH - 40, 130, '▶', {
-      fontSize: '32px', color: '#ffffff', fontFamily: 'monospace',
-    }).setOrigin(0.5).setInteractive();
-    rightBtn.on('pointerdown', () => {
-      this.selectedShipIndex = (this.selectedShipIndex + 1) % ownedShips.length;
-      this.updateShipDisplay(ownedShips);
-    });
-
-    this.updateShipDisplay(ownedShips);
+    this.updatePartsDisplay();
   }
 
-  private updateShipDisplay(ownedShips: ShipDef[]): void {
-    const ship = ownedShips[this.selectedShipIndex];
-    if (!ship) return;
+  private updatePartsDisplay(): void {
+    const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
 
-    const rarityColors: Record<string, string> = { n: '#aaaaaa', r: '#4488ff', sr: '#ff44ff', ssr: '#ffaa00' };
-    const rarityLabels: Record<string, string> = { n: 'N', r: 'R', sr: 'SR', ssr: 'SSR' };
+    PART_SLOTS.forEach((slot, i) => {
+      const partId = equipped[slot];
+      const part = partId ? getPartById(partId) : null;
+      if (part) {
+        const color = PART_RARITY_COLORS[part.rarity];
+        const label = PART_RARITY_LABELS[part.rarity];
+        this.slotTexts[i].setText(`[${label}] ${part.name}`);
+        this.slotTexts[i].setColor(color);
+      } else {
+        this.slotTexts[i].setText('— 未装備 —');
+        this.slotTexts[i].setColor('#444444');
+      }
+    });
 
-    this.shipPreview.setColor('#' + ship.color.toString(16).padStart(6, '0'));
-    this.shipName.setText(`[${rarityLabels[ship.rarity]}] ${ship.name}`);
-    this.shipName.setColor(rarityColors[ship.rarity]);
-    this.shipStats.setText(
-      `HP:${ship.baseHp}  ATK:${ship.baseAtk}  SPD:${ship.baseSpeed}\nFIRE:${ship.fireRate}ms\n${ship.special}`
-    );
+    const stats = calcPartStats(equipped);
+    this.statsText.setText(`HP:${stats.hp}  ATK:${stats.atk}  SPD:${stats.speed}  FR:${stats.fireRate}ms`);
+  }
 
-    this.playerData.data.selectedShip = ship.id;
-    this.playerData.save();
+  private openPartSelect(slot: PartSlot): void {
+    // Close existing popup
+    this.closePartSelect();
+
+    const ownedParts = this.playerData.data.ownedParts;
+    const allSlotParts = getPartsBySlot(slot);
+    const available = allSlotParts.filter(p => ownedParts.includes(p.id));
+
+    if (available.length === 0) return;
+
+    // Overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
+      .setInteractive().setDepth(10);
+    overlay.on('pointerdown', () => this.closePartSelect());
+    this.partSelectContainer.push(overlay);
+
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, 100, `${PART_SLOT_ICONS[slot]} ${PART_SLOT_LABELS[slot]}を選択`, {
+      fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(11);
+    this.partSelectContainer.push(title);
+
+    const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
+    const cardHeight = 55;
+    const gap = 8;
+    const startY = 140;
+
+    available.forEach((part, i) => {
+      const y = startY + i * (cardHeight + gap);
+      const isEquipped = equipped[slot] === part.id;
+      const color = PART_RARITY_COLORS[part.rarity];
+      const bgColor = isEquipped ? 0x223344 : 0x111122;
+
+      const card = this.add.rectangle(GAME_WIDTH / 2, y + cardHeight / 2, GAME_WIDTH - 40, cardHeight, bgColor)
+        .setStrokeStyle(isEquipped ? 2 : 1, Phaser.Display.Color.HexStringToColor(color).color)
+        .setInteractive().setDepth(11);
+      this.partSelectContainer.push(card);
+
+      // Rarity + name
+      const nameText = this.add.text(30, y + 8, `[${PART_RARITY_LABELS[part.rarity]}] ${part.name}`, {
+        fontSize: '14px', color, fontFamily: 'monospace', fontStyle: 'bold',
+      }).setDepth(12);
+      this.partSelectContainer.push(nameText);
+
+      // Stats
+      let statsStr = `HP:${part.hp} ATK:${part.atk} SPD:${part.speed}`;
+      if (part.fireRate > 0) statsStr += ` FR:${part.fireRate}ms`;
+      const statsText = this.add.text(30, y + 28, statsStr, {
+        fontSize: '10px', color: '#888888', fontFamily: 'monospace',
+      }).setDepth(12);
+      this.partSelectContainer.push(statsText);
+
+      // Ability
+      if (part.abilityDesc) {
+        const abilText = this.add.text(GAME_WIDTH - 30, y + 28, part.abilityDesc, {
+          fontSize: '10px', color: '#aaaacc', fontFamily: 'monospace',
+        }).setOrigin(1, 0).setDepth(12);
+        this.partSelectContainer.push(abilText);
+      }
+
+      // Equipped marker
+      if (isEquipped) {
+        const eqMark = this.add.text(GAME_WIDTH - 30, y + 8, '装備中', {
+          fontSize: '11px', color: '#00ff88', fontFamily: 'monospace',
+        }).setOrigin(1, 0).setDepth(12);
+        this.partSelectContainer.push(eqMark);
+      }
+
+      card.on('pointerdown', () => {
+        this.playerData.equipPart(slot, part.id);
+        this.closePartSelect();
+        this.updatePartsDisplay();
+      });
+    });
+  }
+
+  private closePartSelect(): void {
+    for (const obj of this.partSelectContainer) obj.destroy();
+    this.partSelectContainer = [];
   }
 
   private createUpgradePanel(): void {
@@ -161,10 +244,7 @@ export class LobbyScene extends Phaser.Scene {
     startBtn.on('pointerover', () => startBtn.setStyle({ backgroundColor: '#006699' }));
     startBtn.on('pointerout', () => startBtn.setStyle({ backgroundColor: '#004466' }));
     startBtn.on('pointerdown', () => {
-      this.scene.start('GameScene', {
-        playerData: this.playerData,
-        shipId: this.playerData.data.selectedShip,
-      });
+      this.scene.start('GameScene', { playerData: this.playerData });
     });
 
     this.tweens.add({
