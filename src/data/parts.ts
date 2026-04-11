@@ -114,6 +114,24 @@ export const PART_LINES: PartLineDef[] = [
     hp: 4, atk: 1, speed: 0, fireRate: 0,
     ability: 'immortal', abilityDesc: '致死ダメージを1回だけ耐える', color: 0xff4444,
   },
+  {
+    id: 'core_regen', slot: 'core',
+    names: { n: 'リジェネコア', r: 'ヒールコア', sr: 'リペアコア', ur: 'オートリペアコア', lr: '再生コア' },
+    hp: 5, atk: 0, speed: 0, fireRate: 0,
+    ability: 'regen', abilityDesc: 'ウェーブ終了時HP+1回復', color: 0x44ff88,
+  },
+  {
+    id: 'core_light', slot: 'core',
+    names: { n: '軽量コア', r: 'スリムコア', sr: 'コンパクトコア', ur: 'フェザーコア', lr: 'エアロコア' },
+    hp: 3, atk: 0, speed: 30, fireRate: 0,
+    ability: 'lightweight', abilityDesc: 'HP低めだが移動速度+', color: 0x88ccff,
+  },
+  {
+    id: 'core_nova', slot: 'core',
+    names: { n: 'ノヴァコア', r: 'フレアコア', sr: 'バーストコア', ur: 'スーパーノヴァコア', lr: 'ハイパーノヴァコア' },
+    hp: 4, atk: 1, speed: 0, fireRate: 0,
+    ability: 'nova_explode', abilityDesc: '被弾時に周囲に爆発ダメージ', color: 0xff8800,
+  },
 
   // ====== エンジン (移動速度) ======
   {
@@ -145,6 +163,24 @@ export const PART_LINES: PartLineDef[] = [
     names: { n: 'パルスエンジン', r: 'フラッシュエンジン', sr: 'ライトエンジン', ur: 'ルミナスエンジン', lr: '光速エンジン' },
     hp: 1, atk: 0, speed: 370, fireRate: 0,
     ability: 'speed_atk', abilityDesc: '移動速度に応じてATK+1~3', color: 0xff4444,
+  },
+  {
+    id: 'engine_stealth', slot: 'engine',
+    names: { n: 'ステルスエンジン', r: 'クロークエンジン', sr: 'インビジブルエンジン', ur: 'ミラージュエンジン', lr: 'ファントムゼロ' },
+    hp: 0, atk: 0, speed: 340, fireRate: 0,
+    ability: 'stealth', abilityDesc: '停止時に敵弾を回避(2秒ごと)', color: 0x224466,
+  },
+  {
+    id: 'engine_burst', slot: 'engine',
+    names: { n: 'バーストエンジン', r: 'ラッシュエンジン', sr: 'ブレイズエンジン', ur: 'ストライクエンジン', lr: 'ソニックエンジン' },
+    hp: 0, atk: 0, speed: 390, fireRate: 0,
+    ability: 'burst_dodge', abilityDesc: '回避時に一瞬速度2倍', color: 0xff44aa,
+  },
+  {
+    id: 'engine_gravity', slot: 'engine',
+    names: { n: 'グラビティエンジン', r: 'プルエンジン', sr: 'ブラックホールエンジン', ur: 'シンギュラリティエンジン', lr: '重力エンジン' },
+    hp: 0, atk: 0, speed: 330, fireRate: 0,
+    ability: 'gravity_pull', abilityDesc: '周囲の敵弾を引き寄せて消す', color: 0x6644aa,
   },
 
   // ====== ウイング (成長/収集効率) ======
@@ -178,6 +214,24 @@ export const PART_LINES: PartLineDef[] = [
     hp: 1, atk: 1, speed: 50, fireRate: 0,
     ability: 'drop_2x', abilityDesc: '特殊ドロップ率2倍', color: 0xff4444,
   },
+  {
+    id: 'wing_magnet', slot: 'wing',
+    names: { n: 'マグネットウイング', r: 'アトラクトウイング', sr: 'ワイドマグネットウイング', ur: 'メガマグネットウイング', lr: 'グラビトンウイング' },
+    hp: 0, atk: 0, speed: 35, fireRate: 0,
+    ability: 'magnet_up', abilityDesc: 'アイテム吸引範囲+80', color: 0x44aaff,
+  },
+  {
+    id: 'wing_shield', slot: 'wing',
+    names: { n: 'ガードウイング', r: 'プロテクトウイング', sr: 'セーフティウイング', ur: 'バルウォークウイング', lr: '堅牢のウイング' },
+    hp: 2, atk: 0, speed: 25, fireRate: 0,
+    ability: 'wing_shield', abilityDesc: 'ウェーブ開始時シールド+1', color: 0x4488cc,
+  },
+  {
+    id: 'wing_assault', slot: 'wing',
+    names: { n: 'アサルトウイング', r: 'ストライクウイング', sr: 'レイドウイング', ur: 'ブリッツウイング', lr: '殲滅のウイング' },
+    hp: 0, atk: 1, speed: 45, fireRate: 0,
+    ability: 'assault', abilityDesc: '敵撃破時に一定確率でATK一時上昇', color: 0xff6644,
+  },
 
   // ====== メインウェポン (攻撃力/連射/弾タイプ) ======
   {
@@ -209,6 +263,24 @@ export const PART_LINES: PartLineDef[] = [
     names: { n: 'プラズマガン', r: 'プラズマキャノン', sr: 'プラズマライフル', ur: 'ノヴァキャノン', lr: 'ビッグバン' },
     hp: 0, atk: 3, speed: 0, fireRate: 170,
     ability: 'homing_pierce', abilityDesc: 'ホーミング+貫通', color: 0xff4444,
+  },
+  {
+    id: 'mw_shotgun', slot: 'main_weapon',
+    names: { n: 'ショットガン', r: 'バックショット', sr: 'スラッグショット', ur: 'デストロイヤー', lr: 'ジャッジメント' },
+    hp: 0, atk: 4, speed: 0, fireRate: 350,
+    ability: 'shotgun_spread', abilityDesc: '近距離扇状3発同時発射', color: 0xaa6622,
+  },
+  {
+    id: 'mw_sniper', slot: 'main_weapon',
+    names: { n: 'スナイパー', r: 'マークスマン', sr: 'デッドアイ', ur: 'ハンター', lr: 'ゴッドアイ' },
+    hp: 0, atk: 5, speed: 0, fireRate: 400,
+    ability: 'sniper_crit', abilityDesc: '高火力+クリティカル率30%', color: 0x226644,
+  },
+  {
+    id: 'mw_chain', slot: 'main_weapon',
+    names: { n: 'チェーンガン', r: 'アークガン', sr: 'ライトニングガン', ur: 'サンダーボルト', lr: 'ラグナロク' },
+    hp: 0, atk: 2, speed: 0, fireRate: 180,
+    ability: 'chain_lightning', abilityDesc: '着弾時に近くの敵へ連鎖ダメージ', color: 0x44ddff,
   },
 
   // ====== サブウェポン (副武装) ======
@@ -242,6 +314,24 @@ export const PART_LINES: PartLineDef[] = [
     hp: 0, atk: 1, speed: 0, fireRate: 0,
     ability: 'satellite', abilityDesc: 'ドローン2機+後方射撃', color: 0xff4444,
   },
+  {
+    id: 'sw_mine', slot: 'sub_weapon',
+    names: { n: 'マインポッド', r: 'マインランチャー', sr: 'クラスターマイン', ur: 'メガマイン', lr: 'アビスマイン' },
+    hp: 0, atk: 0, speed: 0, fireRate: 0,
+    ability: 'auto_mine', abilityDesc: '3秒ごとに後方に地雷を設置', color: 0xaaaa44,
+  },
+  {
+    id: 'sw_repair', slot: 'sub_weapon',
+    names: { n: 'リペアユニット', r: 'リペアモジュール', sr: 'リペアシステム', ur: 'オートリペア', lr: 'フルリペア' },
+    hp: 1, atk: 0, speed: 0, fireRate: 0,
+    ability: 'auto_repair', abilityDesc: '20秒ごとにHP+1回復', color: 0x44ff44,
+  },
+  {
+    id: 'sw_beam', slot: 'sub_weapon',
+    names: { n: 'ビームユニット', r: 'ビームモジュール', sr: 'ビームキャノン', ur: 'ギガビーム', lr: 'オメガビーム' },
+    hp: 0, atk: 2, speed: 0, fireRate: 0,
+    ability: 'side_beam', abilityDesc: '左右にビームを自動発射', color: 0xff88ff,
+  },
 
   // ====== チップ (パッシブ効果) ======
   {
@@ -273,6 +363,24 @@ export const PART_LINES: PartLineDef[] = [
     names: { n: 'オーバークロック', r: 'ハイクロック', sr: 'メガクロック', ur: 'ウルトラクロック', lr: 'リミットブレイク' },
     hp: 0, atk: 1, speed: 20, fireRate: 0,
     ability: 'overclock', abilityDesc: '全ステ微増+スキル進化率UP', color: 0xff4444,
+  },
+  {
+    id: 'chip_rage', slot: 'chip',
+    names: { n: 'レイジチップ', r: 'フューリーチップ', sr: 'バーサークチップ', ur: 'ラースチップ', lr: 'カオスチップ' },
+    hp: 0, atk: 0, speed: 0, fireRate: 0,
+    ability: 'rage', abilityDesc: 'HP50%以下でATK+3', color: 0xff2200,
+  },
+  {
+    id: 'chip_combo', slot: 'chip',
+    names: { n: 'コンボチップ', r: 'ストリークチップ', sr: 'チェインチップ', ur: 'マルチキルチップ', lr: 'インフィニットチップ' },
+    hp: 0, atk: 0, speed: 0, fireRate: 0,
+    ability: 'combo', abilityDesc: '連続撃破でダメージ倍率UP', color: 0xffaa44,
+  },
+  {
+    id: 'chip_shield', slot: 'chip',
+    names: { n: 'シールドチップ', r: 'プロテクトチップ', sr: 'ガーディアンチップ', ur: 'フォートチップ', lr: 'イージスチップ' },
+    hp: 1, atk: 0, speed: 0, fireRate: 0,
+    ability: 'start_shield', abilityDesc: 'ラン開始時シールド+1', color: 0x4488ff,
   },
 ];
 
