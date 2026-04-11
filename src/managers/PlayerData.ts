@@ -1,12 +1,18 @@
 import { loadData, saveData } from '../utils/storage';
-import { PartSlot, PRESETS } from '../data/parts';
+import {
+  PartSlot, PartRarity, PRESETS, PART_LINES,
+  partKey, parsePartKey, NEXT_RARITY, EVOLUTION_COST,
+} from '../data/parts';
 
 export interface PlayerSave {
   coins: number;
   gems: number;
   ownedShips: string[];
   selectedShip: string;
-  ownedParts: string[];
+  // 旧形式 (マイグレーション用、ランタイムでは使わない)
+  ownedParts?: string[];
+  // 新形式: パーツインベントリ (キー = "lineId:rarity", 値 = 所持数)
+  partInventory: Record<string, number>;
   equippedParts: Record<string, string>;
   upgradeLevels: Record<string, number>;
   highestStage: number;
@@ -17,12 +23,20 @@ export interface PlayerSave {
 
 const DEFAULT_PRESET = PRESETS[0]; // アビス・スカウト
 
+function buildDefaultInventory(): Record<string, number> {
+  const inv: Record<string, number> = {};
+  for (const key of Object.values(DEFAULT_PRESET.parts)) {
+    inv[key] = 1;
+  }
+  return inv;
+}
+
 const DEFAULT_SAVE: PlayerSave = {
   coins: 0,
   gems: 0,
   ownedShips: ['abyss_scout'],
   selectedShip: 'abyss_scout',
-  ownedParts: Object.values(DEFAULT_PRESET.parts),
+  partInventory: buildDefaultInventory(),
   equippedParts: { ...DEFAULT_PRESET.parts },
   upgradeLevels: {},
   highestStage: 0,
@@ -37,13 +51,126 @@ export class PlayerData {
   constructor() {
     const loaded = loadData<PlayerSave>('playerData');
     this.data = loaded ? { ...DEFAULT_SAVE, ...loaded } : { ...DEFAULT_SAVE };
-    // 旧セーブからの移行: ownedParts/equippedParts がなければ初期プリセットを付与
-    if (!this.data.ownedParts || this.data.ownedParts.length === 0) {
-      this.data.ownedParts = [...Object.values(DEFAULT_PRESET.parts)];
-      this.data.equippedParts = { ...DEFAULT_PRESET.parts };
-      this.save();
-    }
+    this.migrateIfNeeded();
   }
+
+  /** 旧セーブからの移行 */
+  private migrateIfNeeded(): void {
+    let dirty = false;
+
+    // 旧形式 ownedParts (string[]) → 新形式 partInventory
+    const oldParts = (this.data as any).ownedParts;
+    if (oldParts && Array.isArray(oldParts) && oldParts.length > 0) {
+      if (!this.data.partInventory || Object.keys(this.data.partInventory).length === 0) {
+        this.data.partInventory = {};
+        for (const pid of oldParts) {
+          const key = pid.includes(':') ? pid : `${pid}:n`;
+          this.data.partInventory[key] = (this.data.partInventory[key] ?? 0) + 1;
+        }
+        dirty = true;
+      }
+      delete (this.data as any).ownedParts;
+      dirty = true;
+    }
+
+    // equippedParts 旧形式 ("core_basic") → 新形式 ("core_basic:n")
+    if (this.data.equippedParts) {
+      for (const [slot, val] of Object.entries(this.data.equippedParts)) {
+        if (val && !val.includes(':')) {
+          this.data.equippedParts[slot] = `${val}:n`;
+          dirty = true;
+        }
+      }
+    }
+
+    // partInventory が空 → 初期プリセットを付与
+    if (!this.data.partInventory || Object.keys(this.data.partInventory).length === 0) {
+      this.data.partInventory = buildDefaultInventory();
+      this.data.equippedParts = { ...DEFAULT_PRESET.parts };
+      dirty = true;
+    }
+
+    if (dirty) this.save();
+  }
+
+  // ====== パーツインベントリ ======
+
+  /** パーツコピーを追加 (ガチャ取得時) */
+  addPartCopy(lineId: string, rarity: PartRarity, count: number = 1): void {
+    const key = partKey(lineId, rarity);
+    this.data.partInventory[key] = (this.data.partInventory[key] ?? 0) + count;
+    this.save();
+  }
+
+  /** パーツの所持数を取得 */
+  getPartCount(lineId: string, rarity: PartRarity): number {
+    return this.data.partInventory[partKey(lineId, rarity)] ?? 0;
+  }
+
+  /** 進化可能かチェック */
+  canEvolve(lineId: string, rarity: PartRarity): boolean {
+    if (!NEXT_RARITY[rarity]) return false;
+    return this.getPartCount(lineId, rarity) >= EVOLUTION_COST;
+  }
+
+  /** パーツを進化 (3個消費 → 次レアリティ1個獲得) */
+  evolvePart(lineId: string, fromRarity: PartRarity): boolean {
+    const nextRarity = NEXT_RARITY[fromRarity];
+    if (!nextRarity) return false;
+    if (!this.canEvolve(lineId, fromRarity)) return false;
+
+    const fromKey = partKey(lineId, fromRarity);
+    const toKey = partKey(lineId, nextRarity);
+
+    // 消費
+    this.data.partInventory[fromKey] -= EVOLUTION_COST;
+    if (this.data.partInventory[fromKey] <= 0) {
+      delete this.data.partInventory[fromKey];
+    }
+
+    // 獲得
+    this.data.partInventory[toKey] = (this.data.partInventory[toKey] ?? 0) + 1;
+
+    // 装備中パーツが消費されて0個になった場合、進化先に自動切替
+    for (const [slot, equipped] of Object.entries(this.data.equippedParts)) {
+      if (equipped === fromKey && (this.data.partInventory[fromKey] ?? 0) <= 0) {
+        this.data.equippedParts[slot] = toKey;
+      }
+    }
+
+    this.save();
+    return true;
+  }
+
+  // ====== 装備 ======
+
+  equipPart(slot: PartSlot, key: string): void {
+    this.data.equippedParts[slot] = key;
+    this.save();
+  }
+
+  getEquippedParts(): Record<PartSlot, string> {
+    return this.data.equippedParts as Record<PartSlot, string>;
+  }
+
+  /** 指定スロットの所持パーツ一覧 */
+  getOwnedPartsForSlot(slot: PartSlot): { key: string; lineId: string; rarity: PartRarity; count: number }[] {
+    const result: { key: string; lineId: string; rarity: PartRarity; count: number }[] = [];
+    for (const [key, count] of Object.entries(this.data.partInventory)) {
+      if (count <= 0) continue;
+      const parsed = parsePartKey(key);
+      const line = PART_LINES.find(l => l.id === parsed.lineId);
+      if (line && line.slot === slot) {
+        result.push({ key, lineId: parsed.lineId, rarity: parsed.rarity, count });
+      }
+    }
+    // レアリティ降順 → 名前順
+    const rarityOrder: Record<string, number> = { lr: 0, ur: 1, sr: 2, r: 3, n: 4 };
+    result.sort((a, b) => (rarityOrder[a.rarity] ?? 9) - (rarityOrder[b.rarity] ?? 9));
+    return result;
+  }
+
+  // ====== ガチャチケット ======
 
   addGachaTicket(amount: number = 1): void {
     this.data.gachaTickets += amount;
@@ -56,6 +183,8 @@ export class PlayerData {
     this.save();
     return true;
   }
+
+  // ====== 通貨 ======
 
   save(): void {
     saveData('playerData', this.data);
@@ -85,6 +214,8 @@ export class PlayerData {
     return true;
   }
 
+  // ====== アップグレード ======
+
   getUpgradeLevel(upgradeId: string): number {
     return this.data.upgradeLevels[upgradeId] ?? 0;
   }
@@ -94,6 +225,8 @@ export class PlayerData {
     this.save();
   }
 
+  // ====== 機体 (後方互換) ======
+
   addShip(shipId: string): boolean {
     if (this.data.ownedShips.includes(shipId)) return false;
     this.data.ownedShips.push(shipId);
@@ -101,21 +234,7 @@ export class PlayerData {
     return true;
   }
 
-  addPart(partId: string): boolean {
-    if (this.data.ownedParts.includes(partId)) return false;
-    this.data.ownedParts.push(partId);
-    this.save();
-    return true;
-  }
-
-  equipPart(slot: PartSlot, partId: string): void {
-    this.data.equippedParts[slot] = partId;
-    this.save();
-  }
-
-  getEquippedParts(): Record<PartSlot, string> {
-    return this.data.equippedParts as Record<PartSlot, string>;
-  }
+  // ====== ランデータ ======
 
   recordRun(stageReached: number): void {
     this.data.totalRuns++;

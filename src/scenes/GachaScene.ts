@@ -3,7 +3,8 @@ import { PlayerData } from '../managers/PlayerData';
 import { GachaManager, GachaResult } from '../managers/GachaManager';
 import {
   PartRarity, PART_RARITY_COLORS, PART_RARITY_LABELS, PART_RARITY_BG,
-  PART_SLOT_LABELS, PART_SLOT_ICONS,
+  PART_SLOT_LABELS, PART_SLOT_ICONS, RARITY_BONUS, RARITY_FIRERATE_BONUS,
+  EVOLUTION_COST, NEXT_RARITY,
 } from '../data/parts';
 
 export class GachaScene extends Phaser.Scene {
@@ -30,7 +31,6 @@ export class GachaScene extends Phaser.Scene {
     g.fillGradientStyle(0x1a0a2e, 0x1a0a2e, 0x2a1a4e, 0x2a1a4e, 1);
     g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Sparkle particles
     for (let i = 0; i < 40; i++) {
       const x = Math.random() * GAME_WIDTH;
       const y = Math.random() * GAME_HEIGHT;
@@ -50,31 +50,26 @@ export class GachaScene extends Phaser.Scene {
   }
 
   private createUI(): void {
-    // Title
     this.add.text(GAME_WIDTH / 2, 40, '🎰 パーツガチャ', {
       fontSize: '28px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    // Gem count
     this.gemText = this.add.text(GAME_WIDTH / 2, 80, `💎 ${this.playerData.data.gems}`, {
       fontSize: '20px', color: '#44aaff', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    // Pity counter
     this.pityText = this.add.text(GAME_WIDTH / 2, 105, this.getPityText(), {
       fontSize: '13px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    // Rates info
-    this.add.text(GAME_WIDTH / 2, 135, 'N50 R30 SR12 SSR5 UR2.5 LR0.5', {
-      fontSize: '10px', color: '#666666', fontFamily: 'monospace',
+    this.add.text(GAME_WIDTH / 2, 135, '排出: N 55%  R 33%  SR 12%', {
+      fontSize: '11px', color: '#666666', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, 153, '50回で SR以上確定', {
+    this.add.text(GAME_WIDTH / 2, 153, '50回で SR確定 / 同パーツ3個で進化!', {
       fontSize: '11px', color: '#886644', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    // Pull button
     const pullBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 160, `ガチャを引く (💎${this.gachaManager.getCost()})`, {
       fontSize: '22px',
       color: '#ffffff',
@@ -92,7 +87,6 @@ export class GachaScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // Free pull with ad
     const adPullBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 100, '📺 広告で無料ガチャ', {
       fontSize: '18px',
       color: '#ffaa00',
@@ -109,7 +103,6 @@ export class GachaScene extends Phaser.Scene {
       adPullBtn.removeInteractive();
     });
 
-    // Back button
     this.add.text(15, GAME_HEIGHT - 35, '← ロビーに戻る', {
       fontSize: '16px', color: '#888888', fontFamily: 'monospace',
     }).setInteractive().on('pointerdown', () => {
@@ -130,78 +123,92 @@ export class GachaScene extends Phaser.Scene {
   }
 
   private showGachaResult(result: GachaResult): void {
-    const rarity = result.part.rarity;
+    const { line, rarity, newCount } = result;
     const color = PART_RARITY_COLORS[rarity];
     const bgColor = PART_RARITY_BG[rarity];
     const label = PART_RARITY_LABELS[rarity];
-    const slotIcon = PART_SLOT_ICONS[result.part.slot];
-    const slotLabel = PART_SLOT_LABELS[result.part.slot];
+    const slotIcon = PART_SLOT_ICONS[line.slot];
+    const slotLabel = PART_SLOT_LABELS[line.slot];
+    const partName = line.names[rarity];
 
     const centerY = GAME_HEIGHT * 0.45;
 
-    // Flash for high rarity
-    if (rarity === 'ur' || rarity === 'lr') {
-      this.cameras.main.flash(600, 255, 100, 100);
-    } else if (rarity === 'ssr') {
-      this.cameras.main.flash(500, 255, 200, 0);
-    } else if (rarity === 'sr') {
-      this.cameras.main.flash(300, 200, 100, 255);
+    // Flash for SR
+    if (rarity === 'sr') {
+      this.cameras.main.flash(400, 200, 100, 255);
+    } else if (rarity === 'r') {
+      this.cameras.main.flash(200, 80, 120, 255);
     }
 
     // Card
-    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 80, 220, bgColor)
+    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 80, 230, bgColor)
       .setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(color).color);
     this.resultContainer.push(card);
 
     // Rarity label
-    const rarityText = this.add.text(GAME_WIDTH / 2, centerY - 85, label, {
+    const rarityText = this.add.text(GAME_WIDTH / 2, centerY - 90, label, {
       fontSize: '22px', color, fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.resultContainer.push(rarityText);
 
     // Slot icon + label
-    const slotText = this.add.text(GAME_WIDTH / 2, centerY - 58, `${slotIcon} ${slotLabel}`, {
+    const slotText = this.add.text(GAME_WIDTH / 2, centerY - 63, `${slotIcon} ${slotLabel}`, {
       fontSize: '14px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
     this.resultContainer.push(slotText);
 
-    // Part icon (large slot icon with part color)
-    const icon = this.add.text(GAME_WIDTH / 2, centerY - 20, slotIcon, {
-      fontSize: '48px', color: '#' + result.part.color.toString(16).padStart(6, '0'),
+    // Part icon
+    const icon = this.add.text(GAME_WIDTH / 2, centerY - 25, slotIcon, {
+      fontSize: '48px', color: '#' + line.color.toString(16).padStart(6, '0'),
     }).setOrigin(0.5);
     this.resultContainer.push(icon);
 
     // Part name
-    const nameText = this.add.text(GAME_WIDTH / 2, centerY + 25, result.part.name, {
+    const nameText = this.add.text(GAME_WIDTH / 2, centerY + 18, partName, {
       fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.resultContainer.push(nameText);
 
-    // NEW / duplicate
-    if (result.isNew) {
-      const newLabel = this.add.text(GAME_WIDTH / 2, centerY + 55, '✨ NEW! ✨', {
-        fontSize: '24px', color: '#00ff88', fontFamily: 'monospace', fontStyle: 'bold',
+    // Copy count + evolution progress
+    const nextRarity = NEXT_RARITY[rarity];
+    let countStr = `所持: ${newCount}個`;
+    if (nextRarity) {
+      countStr += ` (進化まで ${newCount}/${EVOLUTION_COST})`;
+    }
+    const canEvolve = newCount >= EVOLUTION_COST && nextRarity;
+    const countText = this.add.text(GAME_WIDTH / 2, centerY + 45, countStr, {
+      fontSize: '14px',
+      color: canEvolve ? '#00ff88' : '#aaaaaa',
+      fontFamily: 'monospace',
+      fontStyle: canEvolve ? 'bold' : 'normal',
+    }).setOrigin(0.5);
+    this.resultContainer.push(countText);
+
+    if (canEvolve) {
+      const evolveHint = this.add.text(GAME_WIDTH / 2, centerY + 63, '✨ 進化可能! ロビーで進化できます', {
+        fontSize: '12px', color: '#00ff88', fontFamily: 'monospace',
       }).setOrigin(0.5);
-      this.resultContainer.push(newLabel);
-      this.tweens.add({ targets: newLabel, scaleX: 1.2, scaleY: 1.2, duration: 400, yoyo: true, repeat: 2 });
-    } else {
-      const dupLabel = this.add.text(GAME_WIDTH / 2, centerY + 55, `重複 → 🪙${result.coinRefund}に変換`, {
-        fontSize: '16px', color: '#aaaaaa', fontFamily: 'monospace',
-      }).setOrigin(0.5);
-      this.resultContainer.push(dupLabel);
+      this.resultContainer.push(evolveHint);
+      this.tweens.add({ targets: evolveHint, alpha: 0.4, duration: 500, yoyo: true, repeat: -1 });
     }
 
     // Stats
-    let statsStr = `HP:${result.part.hp} ATK:${result.part.atk} SPD:${result.part.speed}`;
-    if (result.part.fireRate > 0) statsStr += ` FR:${result.part.fireRate}ms`;
-    const statsText = this.add.text(GAME_WIDTH / 2, centerY + 80, statsStr, {
+    const bonus = RARITY_BONUS[rarity];
+    const hp = line.hp + bonus.hp;
+    const atk = line.atk + bonus.atk;
+    const spd = line.speed + bonus.speed;
+    let statsStr = `HP:${hp} ATK:${atk} SPD:${spd}`;
+    if (line.fireRate > 0) {
+      statsStr += ` FR:${line.fireRate - RARITY_FIRERATE_BONUS[rarity]}ms`;
+    }
+    const statsText = this.add.text(GAME_WIDTH / 2, centerY + 82, statsStr, {
       fontSize: '12px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
     this.resultContainer.push(statsText);
 
-    // Ability description
-    if (result.part.abilityDesc) {
-      const abilityText = this.add.text(GAME_WIDTH / 2, centerY + 97, result.part.abilityDesc, {
+    // Ability
+    if (line.abilityDesc) {
+      const abilityText = this.add.text(GAME_WIDTH / 2, centerY + 99, line.abilityDesc, {
         fontSize: '12px', color, fontFamily: 'monospace',
       }).setOrigin(0.5);
       this.resultContainer.push(abilityText);

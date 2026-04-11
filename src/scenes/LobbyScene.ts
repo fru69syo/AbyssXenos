@@ -1,9 +1,11 @@
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { PlayerData } from '../managers/PlayerData';
 import {
-  PartSlot, PART_SLOTS, PART_SLOT_LABELS, PART_SLOT_ICONS,
-  getPartById, getPartsBySlot, calcPartStats,
-  PART_RARITY_COLORS, PART_RARITY_LABELS, PRESETS,
+  PartSlot, PartRarity, PART_SLOTS, PART_SLOT_LABELS, PART_SLOT_ICONS,
+  getPartLineById, calcPartStats, parsePartKey, partKey,
+  PART_RARITY_COLORS, PART_RARITY_LABELS, PART_RARITY_BG,
+  RARITY_BONUS, RARITY_FIRERATE_BONUS,
+  EVOLUTION_COST, NEXT_RARITY,
 } from '../data/parts';
 import { UPGRADES } from '../data/upgrades';
 
@@ -13,7 +15,7 @@ export class LobbyScene extends Phaser.Scene {
   private gemText!: Phaser.GameObjects.Text;
   private slotTexts: Phaser.GameObjects.Text[] = [];
   private statsText!: Phaser.GameObjects.Text;
-  private partSelectContainer: Phaser.GameObjects.GameObject[] = [];
+  private popupContainer: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super('LobbyScene');
@@ -63,17 +65,14 @@ export class LobbyScene extends Phaser.Scene {
     PART_SLOTS.forEach((slot, i) => {
       const y = startY + i * rowHeight;
 
-      // Slot icon
       this.add.text(15, y, PART_SLOT_ICONS[slot], {
         fontSize: '14px', color: '#888888', fontFamily: 'monospace',
       });
 
-      // Slot label
       this.add.text(32, y, PART_SLOT_LABELS[slot], {
         fontSize: '11px', color: '#666666', fontFamily: 'monospace',
       });
 
-      // Part name (interactive, updates on equip)
       const partText = this.add.text(110, y, '', {
         fontSize: '13px', color: '#ffffff', fontFamily: 'monospace',
       }).setInteractive();
@@ -82,7 +81,6 @@ export class LobbyScene extends Phaser.Scene {
       this.slotTexts.push(partText);
     });
 
-    // Stats summary
     this.statsText = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 8, '', {
       fontSize: '12px', color: '#aaaaaa', fontFamily: 'monospace', align: 'center',
     }).setOrigin(0.5, 0);
@@ -94,12 +92,18 @@ export class LobbyScene extends Phaser.Scene {
     const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
 
     PART_SLOTS.forEach((slot, i) => {
-      const partId = equipped[slot];
-      const part = partId ? getPartById(partId) : null;
-      if (part) {
-        const color = PART_RARITY_COLORS[part.rarity];
-        const label = PART_RARITY_LABELS[part.rarity];
-        this.slotTexts[i].setText(`[${label}] ${part.name}`);
+      const key = equipped[slot];
+      if (!key || !key.includes(':')) {
+        this.slotTexts[i].setText('— 未装備 —');
+        this.slotTexts[i].setColor('#444444');
+        return;
+      }
+      const { lineId, rarity } = parsePartKey(key);
+      const line = getPartLineById(lineId);
+      if (line) {
+        const color = PART_RARITY_COLORS[rarity];
+        const label = PART_RARITY_LABELS[rarity];
+        this.slotTexts[i].setText(`[${label}] ${line.names[rarity]}`);
         this.slotTexts[i].setColor(color);
       } else {
         this.slotTexts[i].setText('— 未装備 —');
@@ -112,84 +116,124 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private openPartSelect(slot: PartSlot): void {
-    // Close existing popup
-    this.closePartSelect();
+    this.closePopup();
 
-    const ownedParts = this.playerData.data.ownedParts;
-    const allSlotParts = getPartsBySlot(slot);
-    const available = allSlotParts.filter(p => ownedParts.includes(p.id));
+    const ownedParts = this.playerData.getOwnedPartsForSlot(slot);
+    if (ownedParts.length === 0) return;
 
-    if (available.length === 0) return;
+    const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
 
     // Overlay
     const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
       .setInteractive().setDepth(10);
-    overlay.on('pointerdown', () => this.closePartSelect());
-    this.partSelectContainer.push(overlay);
+    overlay.on('pointerdown', () => this.closePopup());
+    this.popupContainer.push(overlay);
 
     // Title
-    const title = this.add.text(GAME_WIDTH / 2, 100, `${PART_SLOT_ICONS[slot]} ${PART_SLOT_LABELS[slot]}を選択`, {
+    const title = this.add.text(GAME_WIDTH / 2, 80, `${PART_SLOT_ICONS[slot]} ${PART_SLOT_LABELS[slot]}を選択`, {
       fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11);
-    this.partSelectContainer.push(title);
+    this.popupContainer.push(title);
 
-    const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
-    const cardHeight = 55;
-    const gap = 8;
-    const startY = 140;
+    const cardHeight = 65;
+    const gap = 6;
+    const startY = 115;
 
-    available.forEach((part, i) => {
+    ownedParts.forEach((item, i) => {
       const y = startY + i * (cardHeight + gap);
-      const isEquipped = equipped[slot] === part.id;
-      const color = PART_RARITY_COLORS[part.rarity];
+      const line = getPartLineById(item.lineId);
+      if (!line) return;
+
+      const isEquipped = equipped[slot] === item.key;
+      const color = PART_RARITY_COLORS[item.rarity];
       const bgColor = isEquipped ? 0x223344 : 0x111122;
 
-      const card = this.add.rectangle(GAME_WIDTH / 2, y + cardHeight / 2, GAME_WIDTH - 40, cardHeight, bgColor)
+      const card = this.add.rectangle(GAME_WIDTH / 2, y + cardHeight / 2, GAME_WIDTH - 30, cardHeight, bgColor)
         .setStrokeStyle(isEquipped ? 2 : 1, Phaser.Display.Color.HexStringToColor(color).color)
         .setInteractive().setDepth(11);
-      this.partSelectContainer.push(card);
+      this.popupContainer.push(card);
 
       // Rarity + name
-      const nameText = this.add.text(30, y + 8, `[${PART_RARITY_LABELS[part.rarity]}] ${part.name}`, {
-        fontSize: '14px', color, fontFamily: 'monospace', fontStyle: 'bold',
+      const rLabel = PART_RARITY_LABELS[item.rarity];
+      const partName = line.names[item.rarity];
+      const nameText = this.add.text(22, y + 6, `[${rLabel}] ${partName}`, {
+        fontSize: '13px', color, fontFamily: 'monospace', fontStyle: 'bold',
       }).setDepth(12);
-      this.partSelectContainer.push(nameText);
+      this.popupContainer.push(nameText);
+
+      // Count + evolution
+      const nextRarity = NEXT_RARITY[item.rarity];
+      const canEvolve = this.playerData.canEvolve(item.lineId, item.rarity);
+      let countStr = `×${item.count}`;
+      if (nextRarity) {
+        countStr += ` (${item.count}/${EVOLUTION_COST})`;
+      }
+      const countText = this.add.text(22, y + 24, countStr, {
+        fontSize: '10px', color: canEvolve ? '#00ff88' : '#888888', fontFamily: 'monospace',
+      }).setDepth(12);
+      this.popupContainer.push(countText);
 
       // Stats
-      let statsStr = `HP:${part.hp} ATK:${part.atk} SPD:${part.speed}`;
-      if (part.fireRate > 0) statsStr += ` FR:${part.fireRate}ms`;
-      const statsText = this.add.text(30, y + 28, statsStr, {
-        fontSize: '10px', color: '#888888', fontFamily: 'monospace',
+      const bonus = RARITY_BONUS[item.rarity];
+      const hp = line.hp + bonus.hp;
+      const atk = line.atk + bonus.atk;
+      const spd = line.speed + bonus.speed;
+      let statsStr = `HP:${hp} ATK:${atk} SPD:${spd}`;
+      if (line.fireRate > 0) {
+        statsStr += ` FR:${line.fireRate - RARITY_FIRERATE_BONUS[item.rarity]}ms`;
+      }
+      const statsText = this.add.text(22, y + 38, statsStr, {
+        fontSize: '9px', color: '#777777', fontFamily: 'monospace',
       }).setDepth(12);
-      this.partSelectContainer.push(statsText);
+      this.popupContainer.push(statsText);
 
       // Ability
-      if (part.abilityDesc) {
-        const abilText = this.add.text(GAME_WIDTH - 30, y + 28, part.abilityDesc, {
-          fontSize: '10px', color: '#aaaacc', fontFamily: 'monospace',
-        }).setOrigin(1, 0).setDepth(12);
-        this.partSelectContainer.push(abilText);
+      if (line.abilityDesc) {
+        const abilText = this.add.text(22, y + 50, line.abilityDesc, {
+          fontSize: '9px', color: '#aaaacc', fontFamily: 'monospace',
+        }).setDepth(12);
+        this.popupContainer.push(abilText);
       }
 
-      // Equipped marker
+      // Right side: equip marker or evolve button
       if (isEquipped) {
-        const eqMark = this.add.text(GAME_WIDTH - 30, y + 8, '装備中', {
+        const eqMark = this.add.text(GAME_WIDTH - 22, y + 10, '装備中', {
           fontSize: '11px', color: '#00ff88', fontFamily: 'monospace',
         }).setOrigin(1, 0).setDepth(12);
-        this.partSelectContainer.push(eqMark);
+        this.popupContainer.push(eqMark);
       }
 
+      // Evolve button
+      if (canEvolve && nextRarity) {
+        const evolveBtn = this.add.text(GAME_WIDTH - 22, y + 36, `進化→${PART_RARITY_LABELS[nextRarity]}`, {
+          fontSize: '11px', color: '#000000', fontFamily: 'monospace', fontStyle: 'bold',
+          backgroundColor: '#00ff88', padding: { x: 6, y: 3 },
+        }).setOrigin(1, 0).setDepth(13).setInteractive();
+        this.popupContainer.push(evolveBtn);
+
+        evolveBtn.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+          pointer.event.stopPropagation();
+          this.playerData.evolvePart(item.lineId, item.rarity);
+          this.closePopup();
+          this.updatePartsDisplay();
+          // 進化演出
+          this.cameras.main.flash(400, 0, 255, 136);
+          this.openPartSelect(slot); // リロード
+        });
+      }
+
+      // Tap card to equip
       card.on('pointerdown', () => {
-        this.playerData.equipPart(slot, part.id);
-        this.closePartSelect();
+        this.playerData.equipPart(slot, item.key);
+        this.closePopup();
         this.updatePartsDisplay();
       });
     });
   }
 
-  private closePartSelect(): void {
-    for (const obj of this.partSelectContainer) obj.destroy();
-    this.partSelectContainer = [];
+  private closePopup(): void {
+    for (const obj of this.popupContainer) obj.destroy();
+    this.popupContainer = [];
   }
 
   private createUpgradePanel(): void {
@@ -232,7 +276,6 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private createButtons(): void {
-    // Start Run button
     const startBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 130, '⚔  出撃  ⚔', {
       fontSize: '28px',
       color: '#ffffff',
@@ -249,15 +292,11 @@ export class LobbyScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: startBtn,
-      scaleX: 1.03,
-      scaleY: 1.03,
-      duration: 600,
-      yoyo: true,
-      repeat: -1,
+      scaleX: 1.03, scaleY: 1.03,
+      duration: 600, yoyo: true, repeat: -1,
       ease: 'Sine.easeInOut',
     });
 
-    // Gacha button
     const gachaBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 65, '🎰  ガチャ', {
       fontSize: '22px',
       color: '#ffaa00',
@@ -270,7 +309,6 @@ export class LobbyScene extends Phaser.Scene {
       this.scene.start('GachaScene', { playerData: this.playerData });
     });
 
-    // Back to title
     this.add.text(15, GAME_HEIGHT - 30, '← タイトル', {
       fontSize: '14px', color: '#666666', fontFamily: 'monospace',
     }).setInteractive().on('pointerdown', () => {
