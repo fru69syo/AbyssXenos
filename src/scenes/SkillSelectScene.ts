@@ -4,6 +4,7 @@ import { SkillDef } from '../data/skills';
 interface SkillSelectData {
   skills: SkillDef[];
   onSelect: (skillId: string) => void;
+  title?: string;
 }
 
 export class SkillSelectScene extends Phaser.Scene {
@@ -12,15 +13,16 @@ export class SkillSelectScene extends Phaser.Scene {
   }
 
   create(data: SkillSelectData): void {
-    const { skills, onSelect } = data;
+    const { skills, onSelect, title } = data;
 
     // Dimmed overlay
     const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7);
 
     // Title
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.2, 'スキル選択', {
-      fontSize: '28px',
-      color: '#ffffff',
+    const isLevelUp = !!title;
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.2, title ?? 'スキル選択', {
+      fontSize: isLevelUp ? '24px' : '28px',
+      color: isLevelUp ? '#88ff88' : '#ffffff',
       fontFamily: 'monospace',
       fontStyle: 'bold',
     }).setOrigin(0.5);
