@@ -106,7 +106,7 @@ export class HUD {
     const startX = 15;
     const y = 80;
     skills.slice(0, 8).forEach((s, i) => {
-      const color = s.skill.rarity === 'epic' ? '#ff44ff' : s.skill.rarity === 'rare' ? '#4488ff' : '#aaaaaa';
+      const color = s.skill.rarity === 'legendary' ? '#ffd700' : s.skill.rarity === 'epic' ? '#ff44ff' : s.skill.rarity === 'rare' ? '#4488ff' : '#aaaaaa';
       const text = this.scene.add.text(startX + i * 22, y, '◆', {
         fontSize: '14px', color,
       }).setScrollFactor(0).setDepth(100);

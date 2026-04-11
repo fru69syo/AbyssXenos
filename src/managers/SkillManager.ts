@@ -2,20 +2,30 @@ import { SKILLS, SkillDef, SkillRarity } from '../data/skills';
 import { SKILL_RARITY_WEIGHTS } from '../config';
 import { RunState } from './RunState';
 
+export interface SkillChoiceInfo {
+  skill: SkillDef;
+  evolutionProgress?: { current: number; required: number; evolvesTo: string };
+}
+
 export class SkillManager {
   getRandomSkillChoices(runState: RunState, count: number = 3): SkillDef[] {
+    const adjustedCount = count + runState.skillChoiceBonus;
+
     const available = SKILLS.filter(skill => {
+      // Legendary skills never appear in the pool
+      if (skill.rarity === 'legendary') return false;
+
       const active = runState.skills.find(s => s.skill.id === skill.id);
       if (!active) return true;
       return skill.stackable && active.stacks < skill.maxStacks;
     });
 
-    if (available.length <= count) return [...available];
+    if (available.length <= adjustedCount) return [...available];
 
     const choices: SkillDef[] = [];
     const pool = [...available];
 
-    for (let i = 0; i < count && pool.length > 0; i++) {
+    for (let i = 0; i < adjustedCount && pool.length > 0; i++) {
       const rarity = this.rollRarity();
       const matching = pool.filter(s => s.rarity === rarity);
       const source = matching.length > 0 ? matching : pool;
@@ -26,6 +36,18 @@ export class SkillManager {
     }
 
     return choices;
+  }
+
+  getEvolutionInfo(skill: SkillDef, runState: RunState): SkillChoiceInfo['evolutionProgress'] | undefined {
+    if (!skill.evolvesTo || !skill.evolveStacks) return undefined;
+    const active = runState.skills.find(s => s.skill.id === skill.id);
+    const current = active ? active.stacks : 0;
+    const evolvedSkill = SKILLS.find(s => s.id === skill.evolvesTo);
+    return {
+      current,
+      required: skill.evolveStacks,
+      evolvesTo: evolvedSkill?.name ?? skill.evolvesTo,
+    };
   }
 
   private rollRarity(): SkillRarity {

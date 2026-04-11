@@ -26,6 +26,7 @@ export const SKILL_RARITY_WEIGHTS = {
   normal: 60,
   rare: 30,
   epic: 10,
+  legendary: 0,
 };
 
 export const COLORS = {

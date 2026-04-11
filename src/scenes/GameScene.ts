@@ -476,6 +476,36 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private buildEvolutionInfos(skills: import('../data/skills').SkillDef[]): Record<string, { current: number; required: number; evolvesTo: string }> {
+    const infos: Record<string, { current: number; required: number; evolvesTo: string }> = {};
+    for (const skill of skills) {
+      const evo = this.skillManager.getEvolutionInfo(skill, this.runState);
+      if (evo) infos[skill.id] = evo;
+    }
+    return infos;
+  }
+
+  private applySkillWithEvolution(skill: import('../data/skills').SkillDef): void {
+    const result = this.runState.applySkill(skill);
+    if (skill.id === 'side_drone' || (result && result.evolvedSkill.id === 'drone_army')) {
+      this.player.updateDrones();
+    }
+    if (result) {
+      this.showEvolutionText(result.evolvedSkill.name);
+    }
+  }
+
+  private showEvolutionText(name: string): void {
+    this.cameras.main.flash(500, 255, 215, 0);
+    const evoText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, `✨ 進化! ${name} ✨`, {
+      fontSize: '24px', color: '#ffd700', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(200);
+    this.tweens.add({
+      targets: evoText, alpha: 0, y: evoText.y - 60, duration: 2000,
+      onComplete: () => evoText.destroy(),
+    });
+  }
+
   private queueLevelUpSkillSelect(): void {
     if (this.runState.pendingLevelUps <= 0) {
       this.waveTransition = false;
@@ -486,12 +516,10 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch('SkillSelectScene', {
       skills,
       title: `LEVEL UP! Lv.${this.runState.level}`,
+      evolutionInfos: this.buildEvolutionInfos(skills),
       onSelect: (skillId: string) => {
         const skill = skills.find(s => s.id === skillId);
-        if (skill) {
-          this.runState.applySkill(skill);
-          if (skill.id === 'side_drone') this.player.updateDrones();
-        }
+        if (skill) this.applySkillWithEvolution(skill);
         this.runState.pendingLevelUps = Math.max(0, this.runState.pendingLevelUps - 1);
         this.scene.resume();
         if (this.runState.pendingLevelUps > 0) {
@@ -621,12 +649,10 @@ export class GameScene extends Phaser.Scene {
     const skills = this.skillManager.getRandomSkillChoices(this.runState, 3);
     this.scene.launch('SkillSelectScene', {
       skills,
+      evolutionInfos: this.buildEvolutionInfos(skills),
       onSelect: (skillId: string) => {
         const skill = skills.find(s => s.id === skillId);
-        if (skill) {
-          this.runState.applySkill(skill);
-          if (skill.id === 'side_drone') this.player.updateDrones();
-        }
+        if (skill) this.applySkillWithEvolution(skill);
         this.scene.resume();
         this.waveManager.nextWave();
         this.waveTransition = false;
@@ -651,12 +677,10 @@ export class GameScene extends Phaser.Scene {
       const skills = this.skillManager.getRandomSkillChoices(this.runState, 3);
       this.scene.launch('SkillSelectScene', {
         skills,
+        evolutionInfos: this.buildEvolutionInfos(skills),
         onSelect: (skillId: string) => {
           const skill = skills.find(s => s.id === skillId);
-          if (skill) {
-            this.runState.applySkill(skill);
-            if (skill.id === 'side_drone') this.player.updateDrones();
-          }
+          if (skill) this.applySkillWithEvolution(skill);
           this.scene.resume();
           this.waveManager = new WaveManager(this.stageIndex);
           this.waveTransition = false;
