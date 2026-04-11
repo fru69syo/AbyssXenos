@@ -1,8 +1,8 @@
-import { SHIPS, ShipDef, ShipRarity, GACHA_WEIGHTS } from '../data/ships';
+import { PARTS, PartDef, PartRarity, PART_GACHA_WEIGHTS, PART_DUPLICATE_COINS } from '../data/parts';
 import { PlayerData } from './PlayerData';
 
 export interface GachaResult {
-  ship: ShipDef;
+  part: PartDef;
   isNew: boolean;
   isDuplicate: boolean;
   coinRefund: number;
@@ -10,12 +10,6 @@ export interface GachaResult {
 
 const PITY_THRESHOLD = 50;
 const GACHA_COST_GEMS = 100;
-const DUPLICATE_COIN_REFUND: Record<ShipRarity, number> = {
-  n: 50,
-  r: 200,
-  sr: 1000,
-  ssr: 5000,
-};
 
 export class GachaManager {
   pull(playerData: PlayerData): GachaResult | null {
@@ -25,40 +19,48 @@ export class GachaManager {
     const isPity = playerData.data.gachaPity >= PITY_THRESHOLD;
 
     const rarity = isPity ? this.guaranteedSRPlus() : this.rollRarity();
-    const ship = this.pickShipOfRarity(rarity);
+    const part = this.pickPartOfRarity(rarity);
 
     if (isPity) {
       playerData.data.gachaPity = 0;
     }
 
-    const isNew = playerData.addShip(ship.id);
-    const coinRefund = isNew ? 0 : DUPLICATE_COIN_REFUND[ship.rarity];
+    const isNew = playerData.addPart(part.id);
+    const coinRefund = isNew ? 0 : PART_DUPLICATE_COINS[part.rarity];
     if (!isNew) {
       playerData.addCoins(coinRefund);
     }
 
     playerData.save();
 
-    return { ship, isNew, isDuplicate: !isNew, coinRefund };
+    return { part, isNew, isDuplicate: !isNew, coinRefund };
   }
 
-  private rollRarity(): ShipRarity {
-    const total = Object.values(GACHA_WEIGHTS).reduce((a, b) => a + b, 0);
+  private rollRarity(): PartRarity {
+    const total = Object.values(PART_GACHA_WEIGHTS).reduce((a, b) => a + b, 0);
     const roll = Math.random() * total;
     let sum = 0;
-    for (const [rarity, weight] of Object.entries(GACHA_WEIGHTS) as [ShipRarity, number][]) {
+    for (const [rarity, weight] of Object.entries(PART_GACHA_WEIGHTS) as [PartRarity, number][]) {
       sum += weight;
       if (roll < sum) return rarity;
     }
     return 'n';
   }
 
-  private guaranteedSRPlus(): ShipRarity {
-    return Math.random() < 0.2 ? 'ssr' : 'sr';
+  private guaranteedSRPlus(): PartRarity {
+    const roll = Math.random();
+    if (roll < 0.05) return 'ur';
+    if (roll < 0.25) return 'ssr';
+    return 'sr';
   }
 
-  private pickShipOfRarity(rarity: ShipRarity): ShipDef {
-    const pool = SHIPS.filter(s => s.rarity === rarity);
+  private pickPartOfRarity(rarity: PartRarity): PartDef {
+    const pool = PARTS.filter(p => p.rarity === rarity);
+    if (pool.length === 0) {
+      // フォールバック: 該当レアリティがなければNを返す
+      const fallback = PARTS.filter(p => p.rarity === 'n');
+      return fallback[Math.floor(Math.random() * fallback.length)];
+    }
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
