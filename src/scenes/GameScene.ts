@@ -399,9 +399,9 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    // Spawn enemies
-    const spawnCmd = this.waveManager.update(delta);
-    if (spawnCmd) {
+    // Spawn enemies (複数のサブグループからまとめて生成される可能性あり)
+    const spawnCmds = this.waveManager.update(delta);
+    for (const spawnCmd of spawnCmds) {
       const enemy = this.enemies.getFirstDead(false) as Enemy | null;
       if (enemy) {
         const def = getEnemyById(spawnCmd.enemyId);
