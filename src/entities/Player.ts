@@ -66,26 +66,26 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     AudioManager.get().playShoot();
     const patterns = this.getShootPatterns();
     for (const pattern of patterns) {
-      this.fireBullet(pattern.x, pattern.y, pattern.vx, pattern.vy);
+      this.fireBullet(pattern.x, pattern.y, pattern.vx, pattern.vy, pattern.isRear);
     }
 
     // Drone shots
     for (const drone of this.drones) {
       if (this.runState.droneAllDirection) {
-        // Fire in 4 directions
+        // Fire in 4 directions. 下向きの弾のみ後方弾扱いにする。
         const speed = this.runState.bulletSpeed;
-        this.fireBullet(drone.x, drone.y, 0, -speed);       // Up
-        this.fireBullet(drone.x, drone.y, 0, speed * 0.6);  // Down
-        this.fireBullet(drone.x, drone.y, -speed * 0.5, 0); // Left
-        this.fireBullet(drone.x, drone.y, speed * 0.5, 0);  // Right
+        this.fireBullet(drone.x, drone.y, 0, -speed);              // Up
+        this.fireBullet(drone.x, drone.y, 0, speed * 0.6, true);   // Down (rear)
+        this.fireBullet(drone.x, drone.y, -speed * 0.5, 0);        // Left
+        this.fireBullet(drone.x, drone.y, speed * 0.5, 0);         // Right
       } else {
         this.fireBullet(drone.x, drone.y, 0, -this.runState.bulletSpeed);
       }
     }
   }
 
-  private getShootPatterns(): { x: number; y: number; vx: number; vy: number }[] {
-    const patterns: { x: number; y: number; vx: number; vy: number }[] = [];
+  private getShootPatterns(): { x: number; y: number; vx: number; vy: number; isRear?: boolean }[] {
+    const patterns: { x: number; y: number; vx: number; vy: number; isRear?: boolean }[] = [];
     const speed = this.runState.bulletSpeed;
 
     switch (this.runState.shotPattern) {
@@ -104,13 +104,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     if (this.runState.hasRearShot) {
-      patterns.push({ x: this.x, y: this.y + 15, vx: 0, vy: speed * 0.8 });
+      patterns.push({ x: this.x, y: this.y + 15, vx: 0, vy: speed * 0.8, isRear: true });
     }
 
     return patterns;
   }
 
-  private fireBullet(x: number, y: number, vx: number, vy: number): void {
+  private fireBullet(x: number, y: number, vx: number, vy: number, isRear: boolean = false): void {
     const bullet = this.bullets.getFirstDead(false) as Bullet | null;
     if (!bullet) return;
 
@@ -121,6 +121,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     bullet.fire(x, y, vx, vy, damage);
+    bullet.isRearShot = isRear;
     bullet.isPiercing = this.runState.hasPierce;
     bullet.isHoming = this.runState.hasHoming;
     bullet.hasExplosion = this.runState.hasExplosion;

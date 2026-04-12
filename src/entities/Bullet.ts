@@ -9,6 +9,8 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
   hasSplit: boolean = false;
   hasExplosion: boolean = false;
   hasMultiBounce: boolean = false;
+  /** 後方に撃ち出された弾 (true の場合、前方へは向かず後方にしか進めない) */
+  isRearShot: boolean = false;
   private bounceCount: number = 0;
   private maxBounces: number = 3;
 
@@ -26,17 +28,22 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(velocityX, velocityY);
     this.damage = damage;
     this.bounceCount = 0;
+    this.isRearShot = false;
   }
 
   update(): void {
     if (!this.active) return;
 
     if (this.isHoming) {
+      // 進行方向の enemy だけを追尾対象にする。
+      // 前方弾 = 現在位置より上(または同じ y)の敵、後方弾 = 下の敵。
+      const isRear = this.isRearShot;
       const enemies = this.scene.children.getAll().filter(
         (obj): obj is Phaser.Physics.Arcade.Sprite =>
           obj instanceof Phaser.Physics.Arcade.Sprite &&
           obj.getData('isEnemy') === true &&
-          obj.active
+          obj.active &&
+          (isRear ? obj.y >= this.y : obj.y <= this.y)
       );
 
       if (enemies.length > 0) {
@@ -48,7 +55,12 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
         }
         const angle = Phaser.Math.Angle.Between(this.x, this.y, closest.x, closest.y);
         const speed = Math.sqrt(this.body!.velocity.x ** 2 + this.body!.velocity.y ** 2);
-        this.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+        let newVx = Math.cos(angle) * speed;
+        let newVy = Math.sin(angle) * speed;
+        // 方向制約: 前方弾は後退禁止、後方弾は前進禁止
+        if (isRear) newVy = Math.max(newVy, 0);
+        else newVy = Math.min(newVy, 0);
+        this.setVelocity(newVx, newVy);
       }
     }
 
