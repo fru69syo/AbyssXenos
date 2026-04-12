@@ -33,6 +33,8 @@ export class GameScene extends Phaser.Scene {
   private bgLayers: Phaser.GameObjects.TileSprite[] = [];
   private waveTransition: boolean = false;
   private stageIndex: number = 0;
+  /** プレイヤー死亡演出中 (true のあいだ HUD/シーン遷移系を止める) */
+  private dying: boolean = false;
   private particles!: Phaser.GameObjects.Particles.ParticleEmitter;
   // Skill effect timers
   private barrierTimer: number = 0;
@@ -102,6 +104,7 @@ export class GameScene extends Phaser.Scene {
 
     this.waveManager = new WaveManager(this.stageIndex);
     this.waveTransition = false;
+    this.dying = false;
     this.boss = null;
     this.midBoss = null;
 
@@ -338,6 +341,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private _update(time: number, delta: number): void {
+    // 死亡演出中 (delayedCall で HUD 破棄 + scene 遷移待ち) は全スキップ
+    // — このまま続けると破棄された HUD の setText で Frame.data が null になり落ちる
+    if (this.dying) return;
     if (this.waveTransition) return;
 
     // Parallax background
@@ -986,6 +992,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPlayerDeath(): void {
+    if (this.dying) return;
+    this.dying = true;
     this.player.setActive(false);
     this.player.setVisible(false);
     this.player.destroyDrones();
