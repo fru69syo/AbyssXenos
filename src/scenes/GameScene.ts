@@ -948,30 +948,30 @@ export class GameScene extends Phaser.Scene {
 
   private onStageComplete(): void {
     this.waveTransition = true;
-    this.runState.currentStage++;
-    this.stageIndex++;
     this.runState.onWaveComplete();
 
-    // Stage clear message + skill select
-    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `STAGE ${this.stageIndex} CLEAR!`, {
+    // ステージクリアを記録 (到達ステージ数の更新 + 獲得コインを永続化)
+    const clearedStageNumber = this.stageIndex + 1;
+    this.playerData.addCoins(this.runState.coins);
+    this.playerData.recordRun(clearedStageNumber);
+
+    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, `STAGE ${clearedStageNumber} CLEAR!`, {
       fontSize: '32px', color: '#00ff88', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(50);
+    const subText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, `🪙 ${this.runState.coins} 獲得`, {
+      fontSize: '18px', color: '#ffd700', fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(50);
+    const hintText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 44, 'ロビーに戻ります…', {
+      fontSize: '14px', color: '#aaaacc', fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(50);
 
-    this.time.delayedCall(1500, () => {
+    this.time.delayedCall(2000, () => {
       clearText.destroy();
-      const skills = this.skillManager.getRandomSkillChoices(this.runState, 3);
-      this.scene.launch('SkillSelectScene', {
-        skills,
-        evolutionInfos: this.buildEvolutionInfos(skills),
-        onSelect: (skillId: string) => {
-          const skill = skills.find(s => s.id === skillId);
-          if (skill) this.applySkillWithEvolution(skill);
-          this.scene.resume();
-          this.waveManager = new WaveManager(this.stageIndex);
-          this.waveTransition = false;
-        },
-      });
-      this.scene.pause();
+      subText.destroy();
+      hintText.destroy();
+      this.hud.destroy();
+      this.touchControls.destroy();
+      this.scene.start('LobbyScene');
     });
   }
 

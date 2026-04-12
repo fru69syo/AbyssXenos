@@ -24,6 +24,10 @@ export class LobbyScene extends Phaser.Scene {
 
   create(): void {
     this.playerData = new PlayerData();
+    // シーン再起動時、slotTexts / popupContainer には前回の破棄済み Text が
+    // 残っておりそのまま setText すると Frame.data が null で落ちるので都度リセット
+    this.slotTexts = [];
+    this.popupContainer = [];
     this.createBackground();
     this.createCurrencyDisplay();
     this.createPartsDisplay();
