@@ -9,6 +9,7 @@ import { SkillManager } from '../managers/SkillManager';
 import { WaveManager } from '../managers/WaveManager';
 import { PlayerData } from '../managers/PlayerData';
 import { calcPartStats, PartSlot } from '../data/parts';
+import { applyPartAbilities } from '../data/partAbilities';
 import { UPGRADES } from '../data/upgrades';
 import { getEnemyById } from '../data/enemies';
 import { HUD } from '../ui/HUD';
@@ -76,6 +77,9 @@ export class GameScene extends Phaser.Scene {
       stats.speed + bonusSpeed,
       stats.fireRate,
     );
+
+    // Apply part abilities (N/R 基本能力 + SR/UR/LR ボーナス能力)
+    applyPartAbilities(this.runState, stats.abilities, stats.bonusAbilities);
 
     // Apply coin rate upgrade
     const coinLevel = this.playerData.getUpgradeLevel('coin_rate');
