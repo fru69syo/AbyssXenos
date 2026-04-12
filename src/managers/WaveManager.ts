@@ -26,7 +26,8 @@ export class WaveManager {
   }
 
   get currentWaveIndex(): number { return this.waveIndex; }
-  get totalWaves(): number { return this.stage.waves.length; }
+  /** 通常ウェーブ数 + ボスの 1 を含めた総ウェーブ数 (例: 4 波 + ボス = 5) */
+  get totalWaves(): number { return this.stage.waves.length + 1; }
   get stageName(): string { return this.stage.name; }
   get isBoss(): boolean { return this.isBossWave; }
   get bossData() { return this.stage.boss; }

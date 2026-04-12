@@ -436,8 +436,8 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
-    // Check wave completion
-    if (this.waveManager.isWaveComplete) {
+    // Check wave completion (waveTransition 中は再突入させない)
+    if (this.waveManager.isWaveComplete && !this.waveTransition) {
       if (this.waveManager.isBoss) {
         this.spawnBoss();
       } else if (this.waveManager.isStageComplete) {
@@ -904,6 +904,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnBoss(): void {
+    if (this.boss) return; // すでに生成済み / 生成中は無視
     this.waveTransition = true;
 
     // Warning text
@@ -930,20 +931,17 @@ export class GameScene extends Phaser.Scene {
     this.waveTransition = true;
     this.runState.onWaveComplete();
 
-    // Show skill select
-    const skills = this.skillManager.getRandomSkillChoices(this.runState, 3);
-    this.scene.launch('SkillSelectScene', {
-      skills,
-      evolutionInfos: this.buildEvolutionInfos(skills),
-      onSelect: (skillId: string) => {
-        const skill = skills.find(s => s.id === skillId);
-        if (skill) this.applySkillWithEvolution(skill);
-        this.scene.resume();
-        this.waveManager.nextWave();
-        this.waveTransition = false;
-      },
+    // 短い "WAVE CLEAR" 演出のあとに次ウェーブへ進む
+    // (スキル付与はレベルアップ時のみ行う)
+    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'WAVE CLEAR', {
+      fontSize: '28px', color: '#00ff88', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(50);
+
+    this.time.delayedCall(700, () => {
+      clearText.destroy();
+      this.waveManager.nextWave();
+      this.waveTransition = false;
     });
-    this.scene.pause();
   }
 
   private onStageComplete(): void {
