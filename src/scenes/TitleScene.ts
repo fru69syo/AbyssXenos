@@ -1,4 +1,5 @@
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
+import { AudioManager } from '../audio/AudioManager';
 
 export class TitleScene extends Phaser.Scene {
   private bgStars: Phaser.GameObjects.Graphics[] = [];
@@ -8,6 +9,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    AudioManager.get().playBGM('lobby');
     // Parallax star background
     this.createStarfield();
 

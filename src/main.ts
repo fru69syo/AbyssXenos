@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from './config';
 import { initErrorBanner } from './utils/errorBanner';
+import { AudioManager } from './audio/AudioManager';
 import { BootScene } from './scenes/BootScene';
 import { TitleScene } from './scenes/TitleScene';
 import { GameScene } from './scenes/GameScene';
@@ -42,3 +43,14 @@ const config: Phaser.Types.Core.GameConfig = {
 
 initErrorBanner();
 new Phaser.Game(config);
+
+// iOS Safari 等の autoplay 制約対策: 初回ユーザー操作で AudioContext を unlock
+const unlockAudio = () => {
+  AudioManager.get().unlock();
+  window.removeEventListener('pointerdown', unlockAudio);
+  window.removeEventListener('keydown', unlockAudio);
+  window.removeEventListener('touchstart', unlockAudio);
+};
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+window.addEventListener('touchstart', unlockAudio);

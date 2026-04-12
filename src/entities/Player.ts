@@ -1,6 +1,7 @@
 import { GAME_WIDTH, GAME_HEIGHT, PLAYER } from '../config';
 import { RunState } from '../managers/RunState';
 import { Bullet } from './Bullet';
+import { AudioManager } from '../audio/AudioManager';
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   runState!: RunState;
@@ -62,6 +63,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private shoot(): void {
     this.shotCount++;
+    AudioManager.get().playShoot();
     const patterns = this.getShootPatterns();
     for (const pattern of patterns) {
       this.fireBullet(pattern.x, pattern.y, pattern.vx, pattern.vy);
@@ -168,6 +170,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     this.runState.hp -= dmg;
     this.setInvincible(1000);
+    AudioManager.get().playDamage();
 
     // Thorns: retaliatory bullet
     if (this.runState.hasThorns) this.fireThorns();

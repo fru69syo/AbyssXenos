@@ -1,5 +1,6 @@
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { PlayerData } from '../managers/PlayerData';
+import { AudioManager } from '../audio/AudioManager';
 
 interface GameOverData {
   playerData: PlayerData;
@@ -16,6 +17,7 @@ export class GameOverScene extends Phaser.Scene {
 
   create(data: GameOverData): void {
     const { playerData, coins, stage, wave, skills } = data;
+    AudioManager.get().stopBGM();
 
     // Background
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x0a0a1e);

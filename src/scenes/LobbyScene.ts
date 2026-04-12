@@ -9,6 +9,7 @@ import {
 } from '../data/parts';
 import { UPGRADES } from '../data/upgrades';
 import { STAGES } from '../data/stages';
+import { AudioManager } from '../audio/AudioManager';
 
 export class LobbyScene extends Phaser.Scene {
   private playerData!: PlayerData;
@@ -24,6 +25,7 @@ export class LobbyScene extends Phaser.Scene {
 
   create(): void {
     this.playerData = new PlayerData();
+    AudioManager.get().playBGM('lobby');
     // シーン再起動時、slotTexts / popupContainer には前回の破棄済み Text が
     // 残っておりそのまま setText すると Frame.data が null で落ちるので都度リセット
     this.slotTexts = [];
@@ -425,6 +427,39 @@ export class LobbyScene extends Phaser.Scene {
       fontSize: '14px', color: '#666666', fontFamily: 'monospace',
     }).setInteractive().on('pointerdown', () => {
       this.scene.start('TitleScene');
+    });
+
+    // 音量 ON/OFF トグル (右下)
+    this.createAudioToggles(GAME_WIDTH - 15, GAME_HEIGHT - 30);
+  }
+
+  private createAudioToggles(rightX: number, y: number): void {
+    const am = AudioManager.get();
+    const seBtn = this.add.text(rightX, y, '', {
+      fontSize: '12px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#222244', padding: { x: 6, y: 3 },
+    }).setOrigin(1, 0).setInteractive();
+    const bgmBtn = this.add.text(rightX - 80, y, '', {
+      fontSize: '12px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#222244', padding: { x: 6, y: 3 },
+    }).setOrigin(1, 0).setInteractive();
+
+    const refresh = () => {
+      bgmBtn.setText(`BGM ${am.muteBGM ? 'OFF' : 'ON'}`);
+      seBtn.setText(`SE ${am.muteSE ? 'OFF' : 'ON'}`);
+      bgmBtn.setStyle({ color: am.muteBGM ? '#888888' : '#ffffff' });
+      seBtn.setStyle({ color: am.muteSE ? '#888888' : '#ffffff' });
+    };
+    refresh();
+
+    bgmBtn.on('pointerdown', () => {
+      am.setMuteBGM(!am.muteBGM);
+      if (!am.muteBGM) am.playBGM('lobby');
+      refresh();
+    });
+    seBtn.on('pointerdown', () => {
+      am.setMuteSE(!am.muteSE);
+      refresh();
     });
   }
 }

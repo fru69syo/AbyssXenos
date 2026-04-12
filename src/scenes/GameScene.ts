@@ -14,6 +14,7 @@ import { getEnemyById } from '../data/enemies';
 import { HUD } from '../ui/HUD';
 import { TouchControls } from '../ui/TouchControls';
 import { reportError } from '../utils/errorBanner';
+import { AudioManager } from '../audio/AudioManager';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -87,6 +88,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    AudioManager.get().playBGM('battle');
     this.createBackground();
     this.createBulletPools();
     this.createEnemyPool();
@@ -276,11 +278,14 @@ export class GameScene extends Phaser.Scene {
             } else {
               this.runState.coins += Math.ceil(pu.value * this.runState.coinMultiplier);
             }
+            AudioManager.get().playCoin();
           } else if (pu.powerUpType === 'heal') {
             const maxHp = this.runState.overMaxHp ? this.runState.maxHp + 5 : this.runState.maxHp;
             this.runState.hp = Math.min(this.runState.hp + 1, maxHp);
+            AudioManager.get().playPowerUp();
           } else if (pu.powerUpType === 'special') {
             this.collectSpecialDrop(pu);
+            AudioManager.get().playPowerUp();
           }
           pu.deactivate();
         } catch (e) {
@@ -520,6 +525,7 @@ export class GameScene extends Phaser.Scene {
     const dropFlag = enemy.specialDropFlag;
     const dropType = enemy.specialDropType;
     const dropChance = enemy.specialDropChance;
+    AudioManager.get().playExplode();
 
     // Explosion effect
     this.particles.emitParticleAt(ex, ey, 8);
@@ -797,6 +803,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.waveTransition = true;
+    AudioManager.get().playLevelUp();
     const skills = this.skillManager.getRandomSkillChoices(this.runState, 3);
     this.scene.launch('SkillSelectScene', {
       skills,
@@ -819,6 +826,7 @@ export class GameScene extends Phaser.Scene {
 
   private onBossKilled(): void {
     if (!this.boss) return;
+    AudioManager.get().playStageClear();
 
     // Big explosion
     for (let i = 0; i < 5; i++) {
@@ -868,6 +876,7 @@ export class GameScene extends Phaser.Scene {
 
   private onMidBossKilled(): void {
     if (!this.midBoss) return;
+    AudioManager.get().playWaveClear();
 
     // 派手な爆発
     for (let i = 0; i < 3; i++) {
@@ -906,6 +915,8 @@ export class GameScene extends Phaser.Scene {
   private spawnBoss(): void {
     if (this.boss) return; // すでに生成済み / 生成中は無視
     this.waveTransition = true;
+    AudioManager.get().playBossWarn();
+    AudioManager.get().playBGM('boss');
 
     // Warning text
     const warning = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '⚠ WARNING ⚠\nBOSS APPROACHING', {
@@ -930,6 +941,7 @@ export class GameScene extends Phaser.Scene {
   private onWaveComplete(): void {
     this.waveTransition = true;
     this.runState.onWaveComplete();
+    AudioManager.get().playWaveClear();
 
     // 短い "WAVE CLEAR" 演出のあとに次ウェーブへ進む
     // (スキル付与はレベルアップ時のみ行う)
@@ -981,6 +993,8 @@ export class GameScene extends Phaser.Scene {
     for (const orb of this.orbitals) orb.destroy();
     this.orbitals = [];
     if (this.cloneSprite) { this.cloneSprite.destroy(); this.cloneSprite = null; }
+    AudioManager.get().playGameOver();
+    AudioManager.get().stopBGM();
 
     // Death explosion
     this.particles.emitParticleAt(this.player.x, this.player.y, 20);
