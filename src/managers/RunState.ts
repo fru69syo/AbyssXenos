@@ -77,6 +77,8 @@ export class RunState {
   fullHealPerWave: boolean;
   droneAllDirection: boolean;
   rapidFireActive: boolean;
+  fireRateReduction: number;
+  thornsDamageMul: number;
 
   constructor(baseHp: number, baseAtk: number, baseSpeed: number, baseFireRate: number) {
     this.hp = baseHp;
@@ -146,6 +148,8 @@ export class RunState {
     this.fullHealPerWave = false;
     this.droneAllDirection = false;
     this.rapidFireActive = false;
+    this.fireRateReduction = 0;
+    this.thornsDamageMul = 0.5;
   }
 
   /** Returns number of level-ups triggered. */
@@ -201,7 +205,7 @@ export class RunState {
     switch (skillId) {
       // ===== Base Attack =====
       case 'atk_up': this.atk += 1; break;
-      case 'fire_rate_up': this.fireRate = Math.max(50, this.fireRate * 0.85); break;
+      case 'fire_rate_up': this.fireRateReduction = Math.min(0.8, this.fireRateReduction + 0.10); break;
       case 'bullet_speed_up': this.bulletSpeed *= 1.2; break;
       case 'bullet_size_up': this.bulletSizeMultiplier *= 1.25; break;
       case 'crit_chance': this.critChance += 0.1; break;
@@ -253,26 +257,29 @@ export class RunState {
 
       // ===== Legendary (進化ボーナス - base stacks already applied) =====
       case 'atk_awakening': this.atk += 2; this.critChance += 0.1; break;
-      case 'machine_gun': this.fireRate = Math.max(30, this.fireRate * 0.5); break;
+      case 'machine_gun': this.fireRateReduction = Math.min(0.8, this.fireRateReduction + 0.30); break;
       case 'light_speed_bullet': this.bulletSpeed *= 2; this.hasPierce = true; break;
       case 'giant_bullet': this.bulletSizeMultiplier *= 1.5; break;
-      case 'critical_master': this.critChance = 0.5; this.critDamage = 2.0; break;
-      case 'full_auto': this.fireRate = Math.max(40, this.fireRate * 0.67); break;
+      case 'critical_master':
+        this.critChance = Math.max(this.critChance, 0.5);
+        this.critDamage = Math.max(this.critDamage, 2.0);
+        break;
+      case 'full_auto': this.fireRateReduction = Math.min(0.8, this.fireRateReduction + 0.20); break;
 
       case 'life_spring': this.maxHp += 2; this.hp = this.maxHp; break;
       case 'iron_wall': this.hasThorns = true; break;
       case 'auto_shield': this.autoShieldPerWave = true; break;
       case 'immortal': this.fullHealPerWave = true; break;
-      case 'afterimage': this.dodgeChance = 0.3; this.hasThorns = true; break;
-      case 'retaliation': this.thornsHoming = true; break;
+      case 'afterimage': this.dodgeChance = Math.max(this.dodgeChance, 0.3); this.hasThorns = true; break;
+      case 'retaliation': this.hasThorns = true; this.thornsHoming = true; this.thornsDamageMul = 1.0; break;
       case 'regen_blessing': this.hpRegenTimer = 5; this.overMaxHp = true; break;
 
-      case 'black_hole': this.magnetRange = 9999; this.hasBulletAbsorb = true; break;
-      case 'alchemy': this.coinMultiplier *= 2; this.hasGemConversion = true; break;
-      case 'genius': this.expMultiplier = 2; this.skillChoiceBonus = 1; break;
-      case 'gale': this.speedMultiplier = 2; this.hasInvincibleDash = true; break;
-      case 'lucky_star': this.dropLuck *= 2; break;
-      case 'drone_army': this.drones = 4; this.droneAllDirection = true; break;
+      case 'black_hole': this.magnetRange = Math.max(this.magnetRange, 9999); this.hasBulletAbsorb = true; break;
+      case 'alchemy': this.coinMultiplier += 1.0; this.hasGemConversion = true; break;
+      case 'genius': this.expMultiplier += 1.0; this.skillChoiceBonus = 1; break;
+      case 'gale': this.speedMultiplier += 0.5; this.hasInvincibleDash = true; break;
+      case 'lucky_star': this.dropLuck = Math.max(this.dropLuck, 5) * 2; break;
+      case 'drone_army': this.drones = Math.max(this.drones, 4); this.droneAllDirection = true; break;
     }
   }
 

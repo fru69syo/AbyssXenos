@@ -32,9 +32,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   update(_time: number, delta: number): void {
     if (!this.active) return;
 
-    // Effective fire rate (rapid fire modifies)
-    let effectiveFireRate = this.runState.fireRate;
+    // Effective fire rate: single additive reduction model (prevents cascade from multiple skills)
+    let effectiveFireRate = this.runState.fireRate * (1 - this.runState.fireRateReduction);
     if (this.runState.rapidFireActive) effectiveFireRate *= 0.5;
+    effectiveFireRate = Math.max(40, effectiveFireRate);
 
     this.fireTimer += delta;
     if (this.fireTimer >= effectiveFireRate) {
@@ -145,20 +146,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   takeDamage(amount: number): boolean {
     if (this.invincible) return false;
 
-    // Dodge check
+    // Dodge check — thorns only fires on dodge if afterimage evolution is active (dodgeChance >= 0.3)
     if (this.runState.dodgeChance > 0 && Math.random() < this.runState.dodgeChance) {
       this.showDamageText('DODGE!', '#44ffaa');
       this.setInvincible(300);
-      // Thorns on dodge (afterimage evolution)
-      if (this.runState.hasThorns) this.fireThorns();
+      if (this.runState.hasThorns && this.runState.dodgeChance >= 0.3) this.fireThorns();
       return false;
     }
 
+    // Shield consumed — the shield itself is the defense; no thorns / timeSlow / absorb trigger
     if (this.runState.shield > 0) {
       this.runState.shield--;
       this.setInvincible(500);
-      // Thorns on shield break
-      if (this.runState.hasThorns) this.fireThorns();
       return false;
     }
 
@@ -207,7 +206,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private fireThorns(): void {
     const bullet = this.bullets.getFirstDead(false) as Bullet | null;
     if (!bullet) return;
-    const damage = Math.max(this.runState.atk, 2);
+    const damage = Math.max(1, Math.floor(this.runState.atk * this.runState.thornsDamageMul));
     bullet.fire(this.x, this.y - 10, 0, -this.runState.bulletSpeed * 1.2, damage);
     bullet.isPiercing = true;
     bullet.isHoming = this.runState.thornsHoming;

@@ -10,6 +10,7 @@ export interface SkillDef {
   maxStacks: number;
   evolvesTo?: string;
   evolveStacks?: number;
+  conflictsWith?: string[];
 }
 
 export const SKILLS: SkillDef[] = [
@@ -22,8 +23,8 @@ export const SKILLS: SkillDef[] = [
   { id: 'rapid_fire', name: 'ラピッドファイア', description: '3秒間連射速度2倍(10秒CD)', rarity: 'normal', category: 'attack', stackable: true, maxStacks: 3, evolvesTo: 'full_auto', evolveStacks: 2 },
 
   // ===== ATTACK - Rare =====
-  { id: 'double_shot', name: 'ダブルショット', description: '2方向に同時発射', rarity: 'rare', category: 'attack', stackable: false, maxStacks: 1 },
-  { id: 'triple_shot', name: 'トリプルショット', description: '3方向に扇状発射', rarity: 'rare', category: 'attack', stackable: false, maxStacks: 1 },
+  { id: 'double_shot', name: 'ダブルショット', description: '2方向に同時発射', rarity: 'rare', category: 'attack', stackable: false, maxStacks: 1, conflictsWith: ['triple_shot'] },
+  { id: 'triple_shot', name: 'トリプルショット', description: '3方向に扇状発射', rarity: 'rare', category: 'attack', stackable: false, maxStacks: 1, conflictsWith: ['double_shot'] },
   { id: 'rear_shot', name: '後方射撃', description: '後方にも弾を発射', rarity: 'rare', category: 'attack', stackable: false, maxStacks: 1 },
   { id: 'pierce', name: '貫通弾', description: '弾が敵を貫通する', rarity: 'rare', category: 'attack', stackable: false, maxStacks: 1 },
   { id: 'explosion_shot', name: '爆裂弾', description: '弾が着弾時に範囲爆発', rarity: 'rare', category: 'attack', stackable: false, maxStacks: 1 },

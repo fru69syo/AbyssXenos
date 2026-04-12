@@ -11,9 +11,20 @@ export class SkillManager {
   getRandomSkillChoices(runState: RunState, count: number = 3): SkillDef[] {
     const adjustedCount = count + runState.skillChoiceBonus;
 
+    // Collect conflict IDs from currently owned skills (mutually-exclusive pairs)
+    const ownedConflicts = new Set<string>();
+    for (const owned of runState.skills) {
+      if (owned.skill.conflictsWith) {
+        for (const id of owned.skill.conflictsWith) ownedConflicts.add(id);
+      }
+    }
+
     const available = SKILLS.filter(skill => {
       // Legendary skills never appear in the pool
       if (skill.rarity === 'legendary') return false;
+
+      // Exclude skills that conflict with anything already owned
+      if (ownedConflicts.has(skill.id)) return false;
 
       const active = runState.skills.find(s => s.skill.id === skill.id);
       if (!active) return true;
