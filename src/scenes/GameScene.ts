@@ -13,6 +13,7 @@ import { UPGRADES } from '../data/upgrades';
 import { getEnemyById } from '../data/enemies';
 import { HUD } from '../ui/HUD';
 import { TouchControls } from '../ui/TouchControls';
+import { reportError } from '../utils/errorBanner';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -259,23 +260,28 @@ export class GameScene extends Phaser.Scene {
     // Player collects power-ups
     this.physics.add.overlap(this.powerUps, this.player,
       (playerObj, puObj) => {
-        const pu = puObj as PowerUp;
-        if (!pu.active) return;
-        if (pu.powerUpType === 'coin') {
-          // Gem conversion chance (alchemy evolution)
-          if (this.runState.hasGemConversion && Math.random() < 0.05) {
-            this.playerData.addGems(1);
-            this.showFloatingText(pu.x, pu.y, '💎 +1', '#44aaff');
-          } else {
-            this.runState.coins += Math.ceil(pu.value * this.runState.coinMultiplier);
+        try {
+          const pu = puObj as PowerUp;
+          if (!pu.active) return;
+          if (pu.powerUpType === 'coin') {
+            // Gem conversion chance (alchemy evolution)
+            if (this.runState.hasGemConversion && Math.random() < 0.05) {
+              this.playerData.addGems(1);
+              this.showFloatingText(pu.x, pu.y, '💎 +1', '#44aaff');
+            } else {
+              this.runState.coins += Math.ceil(pu.value * this.runState.coinMultiplier);
+            }
+          } else if (pu.powerUpType === 'heal') {
+            const maxHp = this.runState.overMaxHp ? this.runState.maxHp + 5 : this.runState.maxHp;
+            this.runState.hp = Math.min(this.runState.hp + 1, maxHp);
+          } else if (pu.powerUpType === 'special') {
+            this.collectSpecialDrop(pu);
           }
-        } else if (pu.powerUpType === 'heal') {
-          const maxHp = this.runState.overMaxHp ? this.runState.maxHp + 5 : this.runState.maxHp;
-          this.runState.hp = Math.min(this.runState.hp + 1, maxHp);
-        } else if (pu.powerUpType === 'special') {
-          this.collectSpecialDrop(pu);
+          pu.deactivate();
+        } catch (e) {
+          reportError('powerup-overlap', e);
+          throw e;
         }
-        pu.deactivate();
       }
     );
   }
@@ -313,6 +319,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    try {
+      this._update(time, delta);
+    } catch (e) {
+      reportError('GameScene.update', e);
+      throw e;
+    }
+  }
+
+  private _update(time: number, delta: number): void {
     if (this.waveTransition) return;
 
     // Parallax background

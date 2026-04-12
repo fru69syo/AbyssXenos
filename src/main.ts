@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from './config';
+import { initErrorBanner } from './utils/errorBanner';
 import { BootScene } from './scenes/BootScene';
 import { TitleScene } from './scenes/TitleScene';
 import { GameScene } from './scenes/GameScene';
@@ -39,4 +40,5 @@ const config: Phaser.Types.Core.GameConfig = {
   },
 };
 
+initErrorBanner();
 new Phaser.Game(config);
