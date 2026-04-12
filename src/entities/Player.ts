@@ -9,6 +9,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private invincible: boolean = false;
   private invincibleTimer: number = 0;
   private drones: Phaser.GameObjects.Sprite[] = [];
+  private shotCount: number = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'player');
@@ -24,14 +25,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setActive(true);
     this.setVisible(true);
     this.invincible = false;
+    this.shotCount = 0;
     this.updateDrones();
   }
 
   update(_time: number, delta: number): void {
     if (!this.active) return;
 
+    // Effective fire rate (rapid fire modifies)
+    let effectiveFireRate = this.runState.fireRate;
+    if (this.runState.rapidFireActive) effectiveFireRate *= 0.5;
+
     this.fireTimer += delta;
-    if (this.fireTimer >= this.runState.fireRate) {
+    if (this.fireTimer >= effectiveFireRate) {
       this.fireTimer = 0;
       this.shoot();
     }
@@ -54,6 +60,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private shoot(): void {
+    this.shotCount++;
     const patterns = this.getShootPatterns();
     for (const pattern of patterns) {
       this.fireBullet(pattern.x, pattern.y, pattern.vx, pattern.vy);
@@ -61,7 +68,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Drone shots
     for (const drone of this.drones) {
-      this.fireBullet(drone.x, drone.y, 0, -this.runState.bulletSpeed);
+      if (this.runState.droneAllDirection) {
+        // Fire in 4 directions
+        const speed = this.runState.bulletSpeed;
+        this.fireBullet(drone.x, drone.y, 0, -speed);       // Up
+        this.fireBullet(drone.x, drone.y, 0, speed * 0.6);  // Down
+        this.fireBullet(drone.x, drone.y, -speed * 0.5, 0); // Left
+        this.fireBullet(drone.x, drone.y, speed * 0.5, 0);  // Right
+      } else {
+        this.fireBullet(drone.x, drone.y, 0, -this.runState.bulletSpeed);
+      }
     }
   }
 
@@ -95,33 +111,118 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const bullet = this.bullets.getFirstDead(false) as Bullet | null;
     if (!bullet) return;
 
-    bullet.fire(x, y, vx, vy, this.runState.atk);
+    // Power shot: every 5th shot deals 3x damage
+    let damage = this.runState.atk;
+    if (this.runState.hasPowerShot && this.shotCount % 5 === 0) {
+      damage *= 3;
+    }
+
+    bullet.fire(x, y, vx, vy, damage);
     bullet.isPiercing = this.runState.hasPierce;
     bullet.isHoming = this.runState.hasHoming;
-    bullet.hasFreeze = this.runState.hasFreeze;
-    bullet.hasBurn = this.runState.hasBurn;
-    bullet.hasSplit = this.runState.hasSplitShot;
+    bullet.hasExplosion = this.runState.hasExplosion;
+    bullet.hasMultiBounce = this.runState.hasMultiBounce;
     bullet.setScale(this.runState.bulletSizeMultiplier);
+
+    // Elemental burst: random element per shot
+    if (this.runState.hasElementalBurst) {
+      const roll = Math.random();
+      bullet.hasFreeze = roll < 0.33;
+      bullet.hasBurn = roll >= 0.33 && roll < 0.66;
+    } else {
+      bullet.hasFreeze = this.runState.hasFreeze;
+      bullet.hasBurn = this.runState.hasBurn;
+    }
+    bullet.hasSplit = this.runState.hasSplitShot;
+
+    // Power shot visual: larger + tinted
+    if (this.runState.hasPowerShot && this.shotCount % 5 === 0) {
+      bullet.setScale(this.runState.bulletSizeMultiplier * 1.8);
+      bullet.setTint(0xffaa00);
+    }
   }
 
   takeDamage(amount: number): boolean {
     if (this.invincible) return false;
 
-    if (this.runState.shield > 0) {
-      this.runState.shield--;
-      this.setInvincible(500);
+    // Dodge check
+    if (this.runState.dodgeChance > 0 && Math.random() < this.runState.dodgeChance) {
+      this.showDamageText('DODGE!', '#44ffaa');
+      this.setInvincible(300);
+      // Thorns on dodge (afterimage evolution)
+      if (this.runState.hasThorns) this.fireThorns();
       return false;
     }
 
-    const dmg = Math.max(1, amount - this.runState.defense);
+    if (this.runState.shield > 0) {
+      this.runState.shield--;
+      this.setInvincible(500);
+      // Thorns on shield break
+      if (this.runState.hasThorns) this.fireThorns();
+      return false;
+    }
+
+    let dmg = Math.max(1, amount - this.runState.defense);
+
+    // Damage cap
+    if (this.runState.hasDamageCap) dmg = 1;
+
     this.runState.hp -= dmg;
     this.setInvincible(1000);
+
+    // Thorns: retaliatory bullet
+    if (this.runState.hasThorns) this.fireThorns();
+
+    // Time slow on hit
+    if (this.runState.hasTimeSlow) {
+      this.scene.time.timeScale = 0.3;
+      this.scene.time.delayedCall(300, () => {
+        this.scene.time.timeScale = 1;
+      });
+    }
+
+    // Absorb: 30% chance to heal 1 HP on damage
+    if (this.runState.hasAbsorb && Math.random() < 0.3) {
+      this.runState.hp = Math.min(this.runState.hp + 1, this.runState.maxHp);
+      this.showDamageText('ABSORB', '#88ff88');
+    }
+
+    // Last Stand: prevent death once
+    if (this.runState.hp <= 0 && this.runState.hasLastStand && !this.runState.lastStandUsed) {
+      this.runState.hp = 1;
+      this.runState.lastStandUsed = true;
+      this.setInvincible(2000);
+      this.showDamageText('LAST STAND!', '#ff4444');
+      this.scene.cameras.main.flash(300, 255, 50, 50);
+      return false;
+    }
 
     if (this.runState.hp <= 0) {
       this.runState.hp = 0;
       return true; // dead
     }
     return false;
+  }
+
+  private fireThorns(): void {
+    const bullet = this.bullets.getFirstDead(false) as Bullet | null;
+    if (!bullet) return;
+    const damage = Math.max(this.runState.atk, 2);
+    bullet.fire(this.x, this.y - 10, 0, -this.runState.bulletSpeed * 1.2, damage);
+    bullet.isPiercing = true;
+    bullet.isHoming = this.runState.thornsHoming;
+    bullet.setScale(1.5);
+    bullet.setTint(0xff4444);
+  }
+
+  private showDamageText(text: string, color: string): void {
+    const t = this.scene.add.text(this.x, this.y - 30, text, {
+      fontSize: '14px', color, fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(60);
+    this.scene.tweens.add({
+      targets: t, y: t.y - 30, alpha: 0, duration: 700,
+      onComplete: () => t.destroy(),
+    });
   }
 
   setInvincible(duration: number): void {

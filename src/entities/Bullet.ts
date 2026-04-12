@@ -7,6 +7,10 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
   hasFreeze: boolean = false;
   hasBurn: boolean = false;
   hasSplit: boolean = false;
+  hasExplosion: boolean = false;
+  hasMultiBounce: boolean = false;
+  private bounceCount: number = 0;
+  private maxBounces: number = 3;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
     super(scene, x, y, texture);
@@ -21,6 +25,7 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
     (this.body as Phaser.Physics.Arcade.Body).enable = true;
     this.setVelocity(velocityX, velocityY);
     this.damage = damage;
+    this.bounceCount = 0;
   }
 
   update(): void {
@@ -44,6 +49,26 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
         const angle = Phaser.Math.Angle.Between(this.x, this.y, closest.x, closest.y);
         const speed = Math.sqrt(this.body!.velocity.x ** 2 + this.body!.velocity.y ** 2);
         this.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+      }
+    }
+
+    // Wall bounce for multi-bounce bullets
+    if (this.hasMultiBounce && this.bounceCount < this.maxBounces) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      let bounced = false;
+      if (this.x <= 2 || this.x >= GAME_WIDTH - 2) {
+        body.velocity.x *= -1;
+        this.x = Phaser.Math.Clamp(this.x, 3, GAME_WIDTH - 3);
+        bounced = true;
+      }
+      if (this.y <= 2) {
+        body.velocity.y *= -1;
+        this.y = 3;
+        bounced = true;
+      }
+      if (bounced) {
+        this.bounceCount++;
+        return; // Don't deactivate this frame
       }
     }
 

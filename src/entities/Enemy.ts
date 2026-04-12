@@ -19,6 +19,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private zigzagTimer: number = 0;
   private zigzagDir: number = 1;
   private sineSeed: number = 0;
+  speedModifier: number = 1;
   private frozen: boolean = false;
   private frozenTimer: number = 0;
   private burning: boolean = false;
@@ -117,6 +118,13 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           this.moveSpeed
         );
         break;
+    }
+
+    // Apply slow field modifier
+    if (this.speedModifier !== 1) {
+      const body = this.body as Phaser.Physics.Arcade.Body;
+      body.velocity.x *= this.speedModifier;
+      body.velocity.y *= this.speedModifier;
     }
 
     // Off-screen check

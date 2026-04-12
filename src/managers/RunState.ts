@@ -76,6 +76,7 @@ export class RunState {
   autoShieldPerWave: boolean;
   fullHealPerWave: boolean;
   droneAllDirection: boolean;
+  rapidFireActive: boolean;
 
   constructor(baseHp: number, baseAtk: number, baseSpeed: number, baseFireRate: number) {
     this.hp = baseHp;
@@ -144,6 +145,7 @@ export class RunState {
     this.autoShieldPerWave = false;
     this.fullHealPerWave = false;
     this.droneAllDirection = false;
+    this.rapidFireActive = false;
   }
 
   /** Returns number of level-ups triggered. */

@@ -32,6 +32,17 @@ export class GameScene extends Phaser.Scene {
   private waveTransition: boolean = false;
   private stageIndex: number = 0;
   private particles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  // Skill effect timers
+  private barrierTimer: number = 0;
+  private hpRegenCounter: number = 0;
+  private rapidFireCDTimer: number = 0;
+  private overchargeTimer: number = 0;
+  private orbitalAngle: number = 0;
+  private orbitalDamageTimer: number = 0;
+  private orbitals: Phaser.GameObjects.Arc[] = [];
+  private cloneSprite: Phaser.GameObjects.Sprite | null = null;
+  private cloneFireTimer: number = 0;
+  private lastWaveIndex: number = -1;
 
   constructor() {
     super('GameScene');
@@ -195,8 +206,21 @@ export class GameScene extends Phaser.Scene {
         const enemy = enemyObj as Enemy;
         if (!bullet.active || !enemy.active) return;
 
-        const killed = enemy.takeDamage(bullet.damage, bullet.hasFreeze, bullet.hasBurn);
+        // Critical hit calculation
+        const { damage, isCrit } = this.calcBulletDamage(bullet);
+        if (isCrit) {
+          this.showFloatingText(enemy.x, enemy.y - 15, 'CRITICAL!', '#ffd700');
+        }
+
+        const ex = enemy.x;
+        const ey = enemy.y;
+        const killed = enemy.takeDamage(damage, bullet.hasFreeze, bullet.hasBurn);
         if (!bullet.isPiercing) bullet.deactivate();
+
+        // Explosion AoE
+        if (bullet.hasExplosion) {
+          this.applyExplosion(ex, ey, Math.ceil(damage * 0.5));
+        }
 
         if (killed) {
           this.onEnemyKilled(enemy);
@@ -238,9 +262,16 @@ export class GameScene extends Phaser.Scene {
         const pu = puObj as PowerUp;
         if (!pu.active) return;
         if (pu.powerUpType === 'coin') {
-          this.runState.coins += Math.ceil(pu.value * this.runState.coinMultiplier);
+          // Gem conversion chance (alchemy evolution)
+          if (this.runState.hasGemConversion && Math.random() < 0.05) {
+            this.playerData.addGems(1);
+            this.showFloatingText(pu.x, pu.y, '💎 +1', '#44aaff');
+          } else {
+            this.runState.coins += Math.ceil(pu.value * this.runState.coinMultiplier);
+          }
         } else if (pu.powerUpType === 'heal') {
-          this.runState.hp = Math.min(this.runState.hp + 1, this.runState.maxHp);
+          const maxHp = this.runState.overMaxHp ? this.runState.maxHp + 5 : this.runState.maxHp;
+          this.runState.hp = Math.min(this.runState.hp + 1, maxHp);
         } else if (pu.powerUpType === 'special') {
           this.collectSpecialDrop(pu);
         }
@@ -291,6 +322,10 @@ export class GameScene extends Phaser.Scene {
 
     this.player.update(time, delta);
 
+    // === Skill effect systems ===
+    this.updateSkillTimers(delta);
+    this.updateSkillEntities(time, delta);
+
     // Attract power-ups
     this.powerUps.getChildren().forEach(child => {
       const pu = child as PowerUp;
@@ -306,13 +341,27 @@ export class GameScene extends Phaser.Scene {
         if (!bullet.active || !this.boss || !this.boss.active) return;
         const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.boss.x, this.boss.y);
         if (dist < 35) {
-          const killed = this.boss.takeDamage(bullet.damage);
+          const { damage, isCrit } = this.calcBulletDamage(bullet);
+          if (isCrit) this.showFloatingText(this.boss.x, this.boss.y - 25, 'CRIT!', '#ffd700');
+          const killed = this.boss.takeDamage(damage);
           if (!bullet.isPiercing) bullet.deactivate();
           if (killed) this.onBossKilled();
         }
       });
       this.updateHud();
       return;
+    }
+
+    // Bomb: wave start screen nuke
+    if (this.runState.hasBomb && this.waveManager.currentWaveIndex !== this.lastWaveIndex) {
+      this.lastWaveIndex = this.waveManager.currentWaveIndex;
+      this.cameras.main.flash(200, 255, 200, 50);
+      this.enemies.getChildren().forEach(child => {
+        const enemy = child as Enemy;
+        if (!enemy.active) return;
+        const killed = enemy.takeDamage(3, false, false);
+        if (killed) this.onEnemyKilled(enemy);
+      });
     }
 
     // Spawn enemies
@@ -339,7 +388,9 @@ export class GameScene extends Phaser.Scene {
         if (!bullet.active || !this.midBoss || !this.midBoss.active) return;
         const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.midBoss.x, this.midBoss.y);
         if (dist < 28) {
-          const killed = this.midBoss.takeDamage(bullet.damage);
+          const { damage, isCrit } = this.calcBulletDamage(bullet);
+          if (isCrit) this.showFloatingText(this.midBoss.x, this.midBoss.y - 20, 'CRIT!', '#ffd700');
+          const killed = this.midBoss.takeDamage(damage);
           if (!bullet.isPiercing) bullet.deactivate();
           if (killed) this.onMidBossKilled();
         }
@@ -453,6 +504,28 @@ export class GameScene extends Phaser.Scene {
     // Explosion effect
     this.particles.emitParticleAt(ex, ey, 8);
 
+    // Chain damage: hurt nearby enemies on kill
+    if (this.runState.hasChainDamage) {
+      this.enemies.getChildren().forEach(child => {
+        const nearby = child as Enemy;
+        if (!nearby.active || nearby === enemy) return;
+        const dist = Phaser.Math.Distance.Between(ex, ey, nearby.x, nearby.y);
+        if (dist < 80) {
+          const chainKilled = nearby.takeDamage(this.runState.atk, false, false);
+          this.particles.emitParticleAt(nearby.x, nearby.y, 3);
+          if (chainKilled) {
+            this.time.delayedCall(50, () => this.onEnemyKilled(nearby));
+          }
+        }
+      });
+    }
+
+    // Lifesteal: 5% chance to heal on kill
+    if (this.runState.hasLifesteal && Math.random() < 0.05) {
+      this.runState.hp = Math.min(this.runState.hp + 1, this.runState.maxHp);
+      this.showFloatingText(this.player.x, this.player.y - 25, '+1 HP', '#00ff66');
+    }
+
     // Coin drop (occasional heal)
     const pu = this.powerUps.getFirstDead(false) as PowerUp | null;
     if (pu) {
@@ -460,8 +533,15 @@ export class GameScene extends Phaser.Scene {
       pu.spawn(ex, ey, type, coinDrop);
     }
 
-    // Special drop (table-driven)
-    if (dropFlag && Math.random() < dropChance) {
+    // Gem finder: 2% chance to drop gem
+    if (this.runState.hasGemFinder && Math.random() < 0.02) {
+      const gp = this.powerUps.getFirstDead(false) as PowerUp | null;
+      if (gp) gp.spawnSpecial(ex, ey, 'gem');
+    }
+
+    // Special drop (table-driven) with dropLuck
+    const luckMultiplier = 1 + this.runState.dropLuck * 0.2;
+    if (dropFlag && Math.random() < dropChance * luckMultiplier) {
       const sp = this.powerUps.getFirstDead(false) as PowerUp | null;
       if (sp) sp.spawnSpecial(ex, ey, dropType);
     }
@@ -474,6 +554,191 @@ export class GameScene extends Phaser.Scene {
     if (levelUps > 0) {
       this.queueLevelUpSkillSelect();
     }
+  }
+
+  // === Skill effect helper methods ===
+
+  private calcBulletDamage(bullet: Bullet): { damage: number; isCrit: boolean } {
+    let damage = bullet.damage;
+    let isCrit = false;
+    if (this.runState.critChance > 0 && Math.random() < this.runState.critChance) {
+      damage = Math.ceil(damage * this.runState.critDamage);
+      isCrit = true;
+    }
+    return { damage, isCrit };
+  }
+
+  private applyExplosion(x: number, y: number, damage: number): void {
+    this.particles.emitParticleAt(x, y, 12);
+    this.enemies.getChildren().forEach(child => {
+      const nearby = child as Enemy;
+      if (!nearby.active) return;
+      const dist = Phaser.Math.Distance.Between(x, y, nearby.x, nearby.y);
+      if (dist < 60) {
+        const killed = nearby.takeDamage(damage, false, false);
+        if (killed) this.onEnemyKilled(nearby);
+      }
+    });
+  }
+
+  private updateSkillTimers(delta: number): void {
+    // Barrier: auto shield every 10s
+    if (this.runState.hasBarrier) {
+      this.barrierTimer += delta;
+      if (this.barrierTimer >= 10000) {
+        this.barrierTimer = 0;
+        this.runState.shield++;
+        this.showFloatingText(this.player.x, this.player.y - 30, '🛡+1', '#44aaff');
+      }
+    }
+
+    // HP regen timer
+    if (this.runState.hpRegenTimer > 0) {
+      this.hpRegenCounter += delta;
+      const interval = this.runState.hpRegenTimer * 1000;
+      if (this.hpRegenCounter >= interval) {
+        this.hpRegenCounter = 0;
+        const maxHp = this.runState.overMaxHp ? this.runState.maxHp + 5 : this.runState.maxHp;
+        if (this.runState.hp < maxHp) {
+          this.runState.hp++;
+          this.showFloatingText(this.player.x, this.player.y - 30, '+1 HP', '#00ff66');
+        }
+      }
+    }
+
+    // Rapid fire burst: 3s active / 10s cooldown
+    if (this.runState.rapidFireStacks > 0) {
+      this.rapidFireCDTimer += delta;
+      if (this.runState.rapidFireActive) {
+        if (this.rapidFireCDTimer >= 3000) {
+          this.runState.rapidFireActive = false;
+          this.rapidFireCDTimer = 0;
+        }
+      } else {
+        if (this.rapidFireCDTimer >= 10000) {
+          this.runState.rapidFireActive = true;
+          this.rapidFireCDTimer = 0;
+          this.showFloatingText(this.player.x, this.player.y - 30, 'RAPID!', '#ffaa00');
+        }
+      }
+    }
+
+    // Overcharge: auto-fire powerful shot every 8s
+    if (this.runState.hasOvercharge) {
+      this.overchargeTimer += delta;
+      if (this.overchargeTimer >= 8000) {
+        this.overchargeTimer = 0;
+        this.fireOverchargeShot();
+      }
+    }
+  }
+
+  private updateSkillEntities(time: number, delta: number): void {
+    // Slow field: reduce enemy speed near player
+    if (this.runState.hasSlowField) {
+      this.enemies.getChildren().forEach(child => {
+        const enemy = child as Enemy;
+        if (!enemy.active) return;
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+        enemy.speedModifier = dist < 120 ? 0.4 : 1.0;
+      });
+    }
+
+    // Bullet absorb: destroy enemy bullets near player
+    if (this.runState.hasBulletAbsorb) {
+      this.enemyBullets.getChildren().forEach(child => {
+        const bullet = child as Bullet;
+        if (!bullet.active) return;
+        const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, bullet.x, bullet.y);
+        if (dist < 60) {
+          bullet.deactivate();
+          this.particles.emitParticleAt(bullet.x, bullet.y, 2);
+        }
+      });
+    }
+
+    // Orbital: rotating damage orbs
+    if (this.runState.hasOrbital) {
+      this.updateOrbitals(delta);
+    }
+
+    // Clone: shadow that follows and fires
+    if (this.runState.hasClone) {
+      this.updateClone(time, delta);
+    }
+  }
+
+  private updateOrbitals(delta: number): void {
+    if (this.orbitals.length === 0) {
+      for (let i = 0; i < 2; i++) {
+        const orb = this.add.circle(0, 0, 6, 0x44ffaa).setDepth(10);
+        this.orbitals.push(orb);
+      }
+    }
+
+    this.orbitalAngle += delta * 0.004;
+    for (let i = 0; i < this.orbitals.length; i++) {
+      const angle = this.orbitalAngle + (Math.PI * i);
+      this.orbitals[i].setPosition(
+        this.player.x + Math.cos(angle) * 50,
+        this.player.y + Math.sin(angle) * 50
+      );
+    }
+
+    this.orbitalDamageTimer += delta;
+    if (this.orbitalDamageTimer >= 200) {
+      this.orbitalDamageTimer = 0;
+      for (const orb of this.orbitals) {
+        this.enemies.getChildren().forEach(child => {
+          const enemy = child as Enemy;
+          if (!enemy.active) return;
+          const dist = Phaser.Math.Distance.Between(orb.x, orb.y, enemy.x, enemy.y);
+          if (dist < 20) {
+            const killed = enemy.takeDamage(1, false, false);
+            if (killed) this.onEnemyKilled(enemy);
+          }
+        });
+        // Also damage mid-boss
+        if (this.midBoss && this.midBoss.active) {
+          const dist = Phaser.Math.Distance.Between(orb.x, orb.y, this.midBoss.x, this.midBoss.y);
+          if (dist < 25) this.midBoss.takeDamage(1);
+        }
+      }
+    }
+  }
+
+  private updateClone(_time: number, delta: number): void {
+    if (!this.cloneSprite) {
+      this.cloneSprite = this.add.sprite(this.player.x - 40, this.player.y, 'player')
+        .setAlpha(0.5).setDepth(5).setTint(0x8888ff);
+    }
+
+    const targetX = this.player.x - 40;
+    const targetY = this.player.y + 20;
+    this.cloneSprite.x += (targetX - this.cloneSprite.x) * 0.1;
+    this.cloneSprite.y += (targetY - this.cloneSprite.y) * 0.1;
+
+    this.cloneFireTimer += delta;
+    if (this.cloneFireTimer >= this.runState.fireRate) {
+      this.cloneFireTimer = 0;
+      const bullet = this.playerBullets.getFirstDead(false) as Bullet | null;
+      if (bullet) {
+        bullet.fire(this.cloneSprite.x, this.cloneSprite.y - 15, 0, -this.runState.bulletSpeed, this.runState.atk);
+        bullet.isPiercing = this.runState.hasPierce;
+        bullet.isHoming = this.runState.hasHoming;
+        bullet.setScale(this.runState.bulletSizeMultiplier * 0.8);
+      }
+    }
+  }
+
+  private fireOverchargeShot(): void {
+    const bullet = this.playerBullets.getFirstDead(false) as Bullet | null;
+    if (!bullet) return;
+    bullet.fire(this.player.x, this.player.y - 15, 0, -this.runState.bulletSpeed * 0.8, this.runState.atk * 5);
+    bullet.isPiercing = true;
+    bullet.setScale(this.runState.bulletSizeMultiplier * 3);
+    bullet.setTint(0xff44ff);
+    this.cameras.main.shake(100, 0.005);
   }
 
   private buildEvolutionInfos(skills: import('../data/skills').SkillDef[]): Record<string, { current: number; required: number; evolvesTo: string }> {
@@ -694,6 +959,10 @@ export class GameScene extends Phaser.Scene {
     this.player.setActive(false);
     this.player.setVisible(false);
     this.player.destroyDrones();
+    // Clean up skill entities
+    for (const orb of this.orbitals) orb.destroy();
+    this.orbitals = [];
+    if (this.cloneSprite) { this.cloneSprite.destroy(); this.cloneSprite = null; }
 
     // Death explosion
     this.particles.emitParticleAt(this.player.x, this.player.y, 20);
@@ -717,5 +986,8 @@ export class GameScene extends Phaser.Scene {
   shutdown(): void {
     this.hud?.destroy();
     this.touchControls?.destroy();
+    for (const orb of this.orbitals) orb.destroy();
+    this.orbitals = [];
+    if (this.cloneSprite) { this.cloneSprite.destroy(); this.cloneSprite = null; }
   }
 }
