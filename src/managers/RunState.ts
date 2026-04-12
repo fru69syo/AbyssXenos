@@ -168,7 +168,9 @@ export class RunState {
   }
 
   private calcExpForLevel(lv: number): number {
-    return 30 + (lv - 2) * 20; // Lv2:30, Lv3:50, Lv4:70, ...
+    // 緩やかに指数的に増加: Lv2:60, Lv3:95, Lv4:135, Lv5:180, Lv6:230, Lv7:290, ...
+    const n = lv - 2;
+    return Math.floor(60 + n * 30 + n * n * 2.5);
   }
 
   applySkill(skill: SkillDef): EvolutionResult | null {

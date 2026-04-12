@@ -8,6 +8,7 @@ import {
   EVOLUTION_COST, NEXT_RARITY, PART_RARITY_ORDER,
 } from '../data/parts';
 import { UPGRADES } from '../data/upgrades';
+import { STAGES } from '../data/stages';
 
 export class LobbyScene extends Phaser.Scene {
   private playerData!: PlayerData;
@@ -260,6 +261,89 @@ export class LobbyScene extends Phaser.Scene {
     this.popupContainer = [];
   }
 
+  private openStageSelect(): void {
+    this.closePopup();
+
+    const highest = this.playerData.data.highestStage; // 0 = まだ未クリア
+
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
+      .setInteractive().setDepth(20);
+    overlay.on('pointerdown', () => this.closePopup());
+    this.popupContainer.push(overlay);
+
+    const title = this.add.text(GAME_WIDTH / 2, 60, 'ステージ選択', {
+      fontSize: '22px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(21);
+    this.popupContainer.push(title);
+
+    const subtitle = this.add.text(GAME_WIDTH / 2, 88, `最高到達: ステージ ${highest}`, {
+      fontSize: '12px', color: '#aaaacc', fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(21);
+    this.popupContainer.push(subtitle);
+
+    const startY = 120;
+    const cardH = 60;
+    const gap = 8;
+
+    STAGES.forEach((stage, i) => {
+      const y = startY + i * (cardH + gap);
+      const stageNum = i + 1;
+      // 初回は Stage1 のみ解放、以後はクリア数+1 まで選択可能
+      const unlocked = stageNum <= highest + 1;
+
+      const bgColor = unlocked ? 0x112244 : 0x111111;
+      const borderColor = unlocked ? 0x4488ff : 0x333333;
+
+      const card = this.add.rectangle(GAME_WIDTH / 2, y + cardH / 2, GAME_WIDTH - 40, cardH, bgColor)
+        .setStrokeStyle(2, borderColor).setDepth(21);
+      this.popupContainer.push(card);
+
+      const nameColor = unlocked ? '#ffffff' : '#555555';
+      const nameText = this.add.text(30, y + 8, `STAGE ${stageNum}`, {
+        fontSize: '14px', color: unlocked ? '#ffd700' : '#555555', fontFamily: 'monospace', fontStyle: 'bold',
+      }).setDepth(22);
+      this.popupContainer.push(nameText);
+
+      const stageLabel = this.add.text(30, y + 26, stage.name, {
+        fontSize: '16px', color: nameColor, fontFamily: 'monospace',
+      }).setDepth(22);
+      this.popupContainer.push(stageLabel);
+
+      const info = this.add.text(30, y + 44, `Wave ${stage.waves.length} + Boss  /  BossHP ${stage.boss.hp}`, {
+        fontSize: '10px', color: unlocked ? '#aaaacc' : '#444444', fontFamily: 'monospace',
+      }).setDepth(22);
+      this.popupContainer.push(info);
+
+      if (unlocked) {
+        const playBtn = this.add.text(GAME_WIDTH - 30, y + cardH / 2, '▶ 出撃', {
+          fontSize: '14px', color: '#000000', fontFamily: 'monospace', fontStyle: 'bold',
+          backgroundColor: '#44ccff', padding: { x: 10, y: 6 },
+        }).setOrigin(1, 0.5).setDepth(23).setInteractive();
+        this.popupContainer.push(playBtn);
+
+        const startStage = (pointer: Phaser.Input.Pointer) => {
+          pointer.event.stopPropagation();
+          this.closePopup();
+          this.scene.start('GameScene', { playerData: this.playerData, startStageIndex: i });
+        };
+        playBtn.on('pointerdown', startStage);
+        card.setInteractive();
+        card.on('pointerdown', startStage);
+      } else {
+        const lockText = this.add.text(GAME_WIDTH - 30, y + cardH / 2, '🔒 LOCKED', {
+          fontSize: '12px', color: '#666666', fontFamily: 'monospace',
+        }).setOrigin(1, 0.5).setDepth(23);
+        this.popupContainer.push(lockText);
+      }
+    });
+
+    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, '✕ 閉じる', {
+      fontSize: '14px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(23).setInteractive();
+    closeBtn.on('pointerdown', () => this.closePopup());
+    this.popupContainer.push(closeBtn);
+  }
+
   private createUpgradePanel(): void {
     this.add.text(GAME_WIDTH / 2, 275, '— 恒久アップグレード —', {
       fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
@@ -311,7 +395,7 @@ export class LobbyScene extends Phaser.Scene {
     startBtn.on('pointerover', () => startBtn.setStyle({ backgroundColor: '#006699' }));
     startBtn.on('pointerout', () => startBtn.setStyle({ backgroundColor: '#004466' }));
     startBtn.on('pointerdown', () => {
-      this.scene.start('GameScene', { playerData: this.playerData });
+      this.openStageSelect();
     });
 
     this.tweens.add({

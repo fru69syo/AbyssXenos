@@ -127,8 +127,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       body.velocity.y *= this.speedModifier;
     }
 
-    // Off-screen check
+    // Off-screen check — 逃したときも Wave 進行用に通知
     if (this.y > GAME_HEIGHT + 50) {
+      this.scene.events.emit('enemy-escaped', this);
       this.deactivate();
     }
   }

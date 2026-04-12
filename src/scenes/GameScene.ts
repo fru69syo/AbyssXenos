@@ -49,7 +49,7 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  init(data: { playerData: PlayerData }): void {
+  init(data: { playerData: PlayerData; startStageIndex?: number }): void {
     this.playerData = data.playerData;
     const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
     const stats = calcPartStats(equipped);
@@ -82,7 +82,7 @@ export class GameScene extends Phaser.Scene {
     const shieldLevel = this.playerData.getUpgradeLevel('start_shield');
     if (shieldLevel > 0) this.runState.shield = shieldLevel;
 
-    this.stageIndex = 0;
+    this.stageIndex = data.startStageIndex ?? 0;
     this.skillManager = new SkillManager();
   }
 
@@ -102,6 +102,11 @@ export class GameScene extends Phaser.Scene {
     this.waveTransition = false;
     this.boss = null;
     this.midBoss = null;
+
+    // 画面外に逃げた敵もウェーブカウンタから差し引く
+    this.events.on('enemy-escaped', () => {
+      this.waveManager.onEnemyDestroyed();
+    });
   }
 
   private createBackground(): void {

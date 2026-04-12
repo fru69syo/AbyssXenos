@@ -13,7 +13,7 @@ export class WaveManager {
   private waveIndex: number = 0;
   private spawnQueue: SpawnCommand[] = [];
   private spawnTimer: number = 0;
-  private spawnInterval: number = 800;
+  private spawnInterval: number = 500;
   private waveComplete: boolean = false;
   private activeEnemies: number = 0;
   private isBossWave: boolean = false;
@@ -62,7 +62,11 @@ export class WaveManager {
   private prepareWave(): void {
     if (this.waveIndex >= this.stage.waves.length) {
       this.isBossWave = true;
-      this.waveComplete = false;
+      // waveComplete = true にしておくと GameScene 側で isWaveComplete &&
+      // isBoss 判定が通り spawnBoss() が呼ばれる
+      this.waveComplete = true;
+      this.spawnQueue = [];
+      this.activeEnemies = 0;
       this.pendingMidBoss = null;
       this.midBossAlive = false;
       return;
