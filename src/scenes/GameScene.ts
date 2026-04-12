@@ -236,7 +236,7 @@ export class GameScene extends Phaser.Scene {
 
     // Enemy bullets hit player
     this.physics.add.overlap(this.enemyBullets, this.player,
-      (playerObj, bulletObj) => {
+      (bulletObj, _playerObj) => {
         const bullet = bulletObj as Bullet;
         if (!bullet.active || !this.player.active) return;
         bullet.deactivate();
@@ -247,7 +247,7 @@ export class GameScene extends Phaser.Scene {
 
     // Enemies collide with player
     this.physics.add.overlap(this.enemies, this.player,
-      (playerObj, enemyObj) => {
+      (enemyObj, _playerObj) => {
         const enemy = enemyObj as Enemy;
         if (!enemy.active || !this.player.active) return;
         enemy.deactivate();
@@ -259,7 +259,7 @@ export class GameScene extends Phaser.Scene {
 
     // Player collects power-ups
     this.physics.add.overlap(this.powerUps, this.player,
-      (playerObj, puObj) => {
+      (puObj, _playerObj) => {
         try {
           const pu = puObj as PowerUp;
           if (!pu.active) return;
