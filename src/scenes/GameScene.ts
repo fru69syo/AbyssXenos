@@ -410,8 +410,8 @@ export class GameScene extends Phaser.Scene {
           if (killed) this.onMidBossKilled();
         }
       });
-      // 中ボスとプレイヤーの接触
-      if (this.player.active) {
+      // 中ボスとプレイヤーの接触 (forEach 内で撃破された場合 midBoss は null)
+      if (this.midBoss && this.midBoss.active && this.player.active) {
         const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.midBoss.x, this.midBoss.y);
         if (dist < 30) {
           const dead = this.player.takeDamage(1);
