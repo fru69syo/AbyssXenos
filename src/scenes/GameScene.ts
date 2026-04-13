@@ -953,14 +953,8 @@ export class GameScene extends Phaser.Scene {
     this.runState.onWaveComplete();
     AudioManager.get().playWaveClear();
 
-    // 短い "WAVE CLEAR" 演出のあとに次ウェーブへ進む
-    // (スキル付与はレベルアップ時のみ行う)
-    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'WAVE CLEAR', {
-      fontSize: '28px', color: '#00ff88', fontFamily: 'monospace', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(50);
-
-    this.time.delayedCall(700, () => {
-      clearText.destroy();
+    // 文字演出は不要。SE のみ鳴らし、短いフェードで次ウェーブへ。
+    this.time.delayedCall(400, () => {
       this.waveManager.nextWave();
       this.waveTransition = false;
     });
