@@ -43,11 +43,11 @@ export class WaveManager {
   get bossData() { return this.stage.boss; }
 
   get isWaveComplete(): boolean {
+    // 全敵を撃破 or 画面外に逃した時点で即次ウェーブへ。duration は廃止。
     return this.spawnedAll
       && this.activeEnemies <= 0
       && !this.midBossAlive
-      && !this.pendingMidBoss
-      && this.waveElapsed >= this.waveDuration;
+      && !this.pendingMidBoss;
   }
 
   get isStageComplete(): boolean {
