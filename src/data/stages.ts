@@ -44,10 +44,10 @@ const G = (
 ): SpawnGroup => ({ enemyId, count, formation, speedBase, startDelay, spawnInterval });
 
 export const STAGES: StageData[] = [
-  // ======== ステージ1: 深海入口 ========
+  // ======== ステージ1: アセリア軌道 [往路] ========
   {
     id: 1,
-    name: '深海入口',
+    name: 'アセリア軌道',
     waves: [
       {
         groups: [
@@ -83,10 +83,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 35, speed: 60, attackPatterns: ['spread'] },
   },
 
-  // ======== ステージ2: 暗黒海溝 ========
+  // ======== ステージ2: 外宇宙・零号域 [往路] ========
   {
     id: 2,
-    name: '暗黒海溝',
+    name: '外宇宙・零号域',
     waves: [
       {
         groups: [
@@ -122,10 +122,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 55, speed: 70, attackPatterns: ['spread', 'aimed'] },
   },
 
-  // ======== ステージ3: 異界の裂け目 ========
+  // ======== ステージ3: 深海回廊 [往路] ========
   {
     id: 3,
-    name: '異界の裂け目',
+    name: '深海回廊',
     waves: [
       {
         groups: [
@@ -161,10 +161,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 85, speed: 80, attackPatterns: ['spread', 'aimed', 'spiral'] },
   },
 
-  // ======== ステージ4: ゼノスの巣窟 ========
+  // ======== ステージ4: 暗黒海溝 [往路] ========
   {
     id: 4,
-    name: 'ゼノスの巣窟',
+    name: '暗黒海溝',
     waves: [
       {
         groups: [
@@ -201,10 +201,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 130, speed: 90, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ5: アビス・コア ========
+  // ======== ステージ5: 異界の裂け目 [往路] ========
   {
     id: 5,
-    name: 'アビス・コア',
+    name: '異界の裂け目',
     waves: [
       {
         groups: [
@@ -241,10 +241,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 190, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ6: 虚骸回廊 ========
+  // ======== ステージ6: ゼノスの巣窟 [往路] ========
   {
     id: 6,
-    name: '虚骸回廊',
+    name: 'ゼノスの巣窟',
     waves: [
       {
         groups: [
@@ -281,10 +281,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 220, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ7: 遺伝子坩堝 ========
+  // ======== ステージ7: マザー・コア [特異点/完全シンクロ] ========
   {
     id: 7,
-    name: '遺伝子坩堝',
+    name: 'マザー・コア',
     waves: [
       {
         groups: [
@@ -321,10 +321,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 250, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ8: 星屑墓場 ========
+  // ======== ステージ8: 認知の狭間 [復路 - フィルター直後] ========
   {
     id: 8,
-    name: '星屑墓場',
+    name: '認知の狭間',
     waves: [
       {
         groups: [
@@ -362,10 +362,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 280, speed: 105, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ9: 神経網 ========
+  // ======== ステージ9: 虚構の帰還路 [復路] ========
   {
     id: 9,
-    name: '神経網',
+    name: '虚構の帰還路',
     waves: [
       {
         groups: [
@@ -402,10 +402,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 310, speed: 110, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ10: 鏡面次元 ========
+  // ======== ステージ10: アセリア外縁 [復路 - 防衛艦隊を誤認] ========
   {
     id: 10,
-    name: '鏡面次元',
+    name: 'アセリア外縁',
     waves: [
       {
         groups: [
@@ -443,10 +443,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 340, speed: 115, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ11: 量子残響 ========
+  // ======== ステージ11: 鏡面次元 [復路 - 認識反転] ========
   {
     id: 11,
-    name: '量子残響',
+    name: '鏡面次元',
     waves: [
       {
         groups: [
@@ -484,10 +484,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 360, speed: 115, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ12: 終末孵卵 ========
+  // ======== ステージ12: 殉教者の空 [復路 - 子供たちの特攻機] ========
   {
     id: 12,
-    name: '終末孵卵',
+    name: '殉教者の空',
     waves: [
       {
         groups: [
@@ -525,10 +525,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 380, speed: 120, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ13: 溶岩蛹 ========
+  // ======== ステージ13: 防衛環 第一軌道 [復路 - 母星防衛ライン突破] ========
   {
     id: 13,
-    name: '溶岩蛹',
+    name: '防衛環 第一軌道',
     waves: [
       {
         groups: [
@@ -567,10 +567,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 400, speed: 125, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ14: 神性侵蝕 ========
+  // ======== ステージ14: 旗艦インフェルノ [最終 - かつての恩師の総司令艦] ========
   {
     id: 14,
-    name: '神性侵蝕',
+    name: '旗艦インフェルノ',
     waves: [
       {
         groups: [
@@ -609,10 +609,10 @@ export const STAGES: StageData[] = [
     boss: { hp: 430, speed: 130, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
   },
 
-  // ======== ステージ15: 混沌の極点 ========
+  // ======== ステージ15: 羽化の終点 アセリア [最終 - 母星殲滅/神への羽化] ========
   {
     id: 15,
-    name: '混沌の極点',
+    name: '羽化の終点 アセリア',
     waves: [
       {
         groups: [
