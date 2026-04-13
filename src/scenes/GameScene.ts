@@ -3,6 +3,7 @@ import { Player } from '../entities/Player';
 import { Bullet } from '../entities/Bullet';
 import { Enemy } from '../entities/Enemy';
 import { Boss } from '../entities/Boss';
+import { Obstacle } from '../entities/Obstacle';
 import { PowerUp } from '../entities/PowerUp';
 import { RunState } from '../managers/RunState';
 import { SkillManager } from '../managers/SkillManager';
@@ -23,6 +24,8 @@ export class GameScene extends Phaser.Scene {
   private enemyBullets!: Phaser.GameObjects.Group;
   private enemies!: Phaser.GameObjects.Group;
   private powerUps!: Phaser.GameObjects.Group;
+  private obstacles!: Phaser.GameObjects.Group;
+  private obstacleSpawnTimer: number = 0;
   private boss: Boss | null = null;
   private midBoss: Boss | null = null;
   private runState!: RunState;
@@ -98,6 +101,7 @@ export class GameScene extends Phaser.Scene {
     this.createBackground();
     this.createBulletPools();
     this.createEnemyPool();
+    this.createObstaclePool();
     this.createPowerUpPool();
     this.createPlayer();
     this.createParticles();
@@ -185,6 +189,20 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private createObstaclePool(): void {
+    this.obstacles = this.add.group({
+      classType: Obstacle,
+      maxSize: 8,
+      runChildUpdate: true,
+    });
+    for (let i = 0; i < 8; i++) {
+      const o = new Obstacle(this, -100, -100);
+      o.deactivate();
+      this.obstacles.add(o);
+    }
+    this.obstacleSpawnTimer = 0;
+  }
+
   private createPowerUpPool(): void {
     this.powerUps = this.add.group({
       classType: PowerUp,
@@ -266,6 +284,24 @@ export class GameScene extends Phaser.Scene {
         if (!enemy.active || !this.player.active) return;
         enemy.deactivate();
         this.waveManager.onEnemyDestroyed();
+        const dead = this.player.takeDamage(1);
+        if (dead) this.onPlayerDeath();
+      }
+    );
+
+    // Player bullets are blocked by obstacles (no damage to obstacle)
+    this.physics.add.overlap(this.playerBullets, this.obstacles,
+      (bulletObj, _obObj) => {
+        const bullet = bulletObj as Bullet;
+        if (!bullet.active) return;
+        bullet.deactivate();
+      }
+    );
+
+    // Obstacle touches player
+    this.physics.add.overlap(this.obstacles, this.player,
+      (_obObj, _playerObj) => {
+        if (!this.player.active) return;
         const dead = this.player.takeDamage(1);
         if (dead) this.onPlayerDeath();
       }
@@ -451,6 +487,9 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
+    // Obstacle: periodic spawn + aimed fire
+    this.updateObstacles(delta);
+
     // Check wave completion (waveTransition 中は再突入させない)
     if (this.waveManager.isWaveComplete && !this.waveTransition) {
       if (this.waveManager.isBoss) {
@@ -463,6 +502,38 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.updateHud();
+  }
+
+  private updateObstacles(delta: number): void {
+    // 定期スポーン: ~8 秒おきに 1 体、画面上部ランダム x。ボス戦時は出さない。
+    if (!this.boss) {
+      this.obstacleSpawnTimer += delta;
+      const activeCount = this.obstacles.getChildren().filter(o => (o as Obstacle).active).length;
+      if (this.obstacleSpawnTimer >= 8000 && activeCount < 3) {
+        this.obstacleSpawnTimer = 0;
+        const ob = this.obstacles.getFirstDead(false) as Obstacle | null;
+        if (ob) {
+          const margin = 50;
+          const x = margin + Math.random() * (GAME_WIDTH - margin * 2);
+          ob.spawn(x, -40);
+        }
+      }
+    }
+
+    // Aimed fire
+    const speed = 230;
+    this.obstacles.getChildren().forEach(child => {
+      const ob = child as Obstacle;
+      if (!ob.active) return;
+      ob.attackTimer += delta;
+      if (ob.attackTimer >= ob.attackInterval) {
+        ob.attackTimer = 0;
+        if (!this.player.active) return;
+        const a = Phaser.Math.Angle.Between(ob.x, ob.y, this.player.x, this.player.y);
+        const bullet = this.enemyBullets.getFirstDead(false) as Bullet | null;
+        if (bullet) bullet.fire(ob.x, ob.y, Math.cos(a) * speed, Math.sin(a) * speed, 1);
+      }
+    });
   }
 
   private updateHud(): void {
@@ -927,6 +998,9 @@ export class GameScene extends Phaser.Scene {
     this.waveTransition = true;
     AudioManager.get().playBossWarn();
     AudioManager.get().playBGM('boss');
+
+    // ボス戦では障害物を一掃
+    this.obstacles.getChildren().forEach(o => (o as Obstacle).deactivate());
 
     // Warning text
     const warning = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '⚠ WARNING ⚠\nBOSS APPROACHING', {

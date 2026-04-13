@@ -121,6 +121,24 @@ export class BootScene extends Phaser.Scene {
     exp.fillCircle(3, 3, 3);
     exp.generateTexture('particle', 6, 6);
     exp.destroy();
+
+    // Obstacle: 壊れない岩塊 (鋼色の八角形 + リベット)
+    const ob = this.add.graphics();
+    ob.fillStyle(0x555566, 1);
+    ob.fillRoundedRect(0, 0, 36, 36, 6);
+    ob.fillStyle(0x777788, 1);
+    ob.fillRoundedRect(3, 3, 30, 30, 4);
+    ob.fillStyle(0x333344, 1);
+    ob.fillCircle(8, 8, 2);
+    ob.fillCircle(28, 8, 2);
+    ob.fillCircle(8, 28, 2);
+    ob.fillCircle(28, 28, 2);
+    ob.fillStyle(0xff3333, 1);
+    ob.fillCircle(18, 18, 4);
+    ob.lineStyle(2, 0x222233, 1);
+    ob.strokeRoundedRect(0, 0, 36, 36, 6);
+    ob.generateTexture('obstacle', 36, 36);
+    ob.destroy();
   }
 
   private generateEnemyTexture(key: string, color: number): void {
