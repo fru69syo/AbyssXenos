@@ -33,15 +33,16 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setData('isEnemy', true);
   }
 
-  spawn(x: number, y: number, def: EnemyDef, speedBase: number): void {
+  spawn(x: number, y: number, def: EnemyDef, speedBase: number, hpMultiplier: number = 1): void {
     this.setPosition(x, y);
     this.setActive(true);
     this.setVisible(true);
     (this.body as Phaser.Physics.Arcade.Body).enable = true;
 
     this.def = def;
-    this.hp = def.hp;
-    this.maxHp = def.hp;
+    const scaledHp = Math.max(1, Math.round(def.hp * hpMultiplier));
+    this.hp = scaledHp;
+    this.maxHp = scaledHp;
     this.moveSpeed = speedBase * def.speedMul;
     this.expValue = def.exp;
     this.coinDrop = def.coin;

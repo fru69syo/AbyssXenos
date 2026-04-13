@@ -436,12 +436,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Spawn enemies (複数のサブグループからまとめて生成される可能性あり)
+    // 敵 HP はステージ数に比例してスケール (stage 1 = ×1、stage 15 = ×15)
+    const hpMul = this.stageIndex + 1;
     const spawnCmds = this.waveManager.update(delta);
     for (const spawnCmd of spawnCmds) {
       const enemy = this.enemies.getFirstDead(false) as Enemy | null;
       if (enemy) {
         const def = getEnemyById(spawnCmd.enemyId);
-        enemy.spawn(spawnCmd.x, spawnCmd.y, def, spawnCmd.speedBase);
+        enemy.spawn(spawnCmd.x, spawnCmd.y, def, spawnCmd.speedBase, hpMul);
       }
     }
 
