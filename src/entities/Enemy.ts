@@ -1,6 +1,7 @@
 import { GAME_HEIGHT } from '../config';
 import { EnemyDef, MoveTypeCode, AttackTypeCode } from '../data/enemies';
 import { SpecialDropType } from '../data/dropTypes';
+import { playAnimIfExists } from '../utils/playAnimIfExists';
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   def!: EnemyDef;
@@ -57,6 +58,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setTexture(def.graphic);
     this.setScale(def.scale);
     this.clearTint();
+    playAnimIfExists(this, `${def.graphic}_idle`);
 
     this.frozen = false;
     this.burning = false;

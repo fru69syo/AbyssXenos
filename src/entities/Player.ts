@@ -2,6 +2,7 @@ import { GAME_WIDTH, GAME_HEIGHT, PLAYER } from '../config';
 import { RunState } from '../managers/RunState';
 import { Bullet } from './Bullet';
 import { AudioManager } from '../audio/AudioManager';
+import { playAnimIfExists } from '../utils/playAnimIfExists';
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   runState!: RunState;
@@ -18,6 +19,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
     this.setCollideWorldBounds(true);
     (this.body as Phaser.Physics.Arcade.Body).setSize(20, 20);
+    playAnimIfExists(this, 'player_idle');
   }
 
   init(runState: RunState, bulletGroup: Phaser.GameObjects.Group): void {
@@ -241,6 +243,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     for (let i = 0; i < this.runState.drones; i++) {
       const drone = this.scene.add.sprite(this.x, this.y, 'drone');
       drone.setScale(0.6);
+      playAnimIfExists(drone, 'drone_idle');
       this.drones.push(drone);
     }
   }

@@ -1,6 +1,7 @@
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { BossData } from '../data/stages';
 import { Bullet } from './Bullet';
+import { playAnimIfExists } from '../utils/playAnimIfExists';
 
 export class Boss extends Phaser.Physics.Arcade.Sprite {
   hp: number = 30;
@@ -40,6 +41,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.setActive(true);
     this.setVisible(true);
     (this.body as Phaser.Physics.Arcade.Body).enable = true;
+    playAnimIfExists(this, 'boss_idle');
   }
 
   initAsMidBoss(data: BossData): void {
@@ -58,6 +60,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.setActive(true);
     this.setVisible(true);
     (this.body as Phaser.Physics.Arcade.Body).enable = true;
+    playAnimIfExists(this, 'midboss_idle');
   }
 
   update(_time: number, delta: number): void {

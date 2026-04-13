@@ -1,4 +1,5 @@
 import { GAME_HEIGHT } from '../config';
+import { playAnimIfExists } from '../utils/playAnimIfExists';
 
 /**
  * 壊れない障害物。画面をゆっくり降下しながら自機を狙って弾を撃つ。
@@ -26,6 +27,7 @@ export class Obstacle extends Phaser.Physics.Arcade.Sprite {
     this.attackTimer = 0;
     // 初弾まで少し間を空ける
     this.attackTimer = -600;
+    playAnimIfExists(this, 'obstacle_idle');
   }
 
   update(): void {

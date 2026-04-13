@@ -1,4 +1,5 @@
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { playAnimIfExists } from '../utils/playAnimIfExists';
 
 export class Bullet extends Phaser.Physics.Arcade.Sprite {
   damage: number = 1;
@@ -29,6 +30,7 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
     this.damage = damage;
     this.bounceCount = 0;
     this.isRearShot = false;
+    playAnimIfExists(this, `${this.texture.key}_idle`);
   }
 
   update(): void {

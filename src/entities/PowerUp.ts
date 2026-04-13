@@ -1,5 +1,6 @@
 import { GAME_HEIGHT } from '../config';
 import { SpecialDropType, DROP_TYPES } from '../data/dropTypes';
+import { playAnimIfExists } from '../utils/playAnimIfExists';
 
 export type PowerUpType = 'coin' | 'heal' | 'special';
 
@@ -25,6 +26,7 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
 
     if (type === 'coin') this.setTexture('powerup_coin');
     else if (type === 'heal') this.setTexture('powerup_heal');
+    playAnimIfExists(this, `${this.texture.key}_idle`);
 
     this.setVelocity(0, 80);
   }
@@ -34,6 +36,7 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     this.specialDropType = dropType;
     const def = DROP_TYPES[dropType];
     this.setTexture(def.textureKey);
+    playAnimIfExists(this, `${this.texture.key}_idle`);
   }
 
   update(): void {
