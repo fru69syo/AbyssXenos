@@ -243,4 +243,19 @@ export class PlayerData {
     }
     this.save();
   }
+
+  // ====== デバッグ用リセット ======
+
+  resetStageProgress(): void {
+    this.data.highestStage = 0;
+    this.data.totalRuns = 0;
+    this.save();
+  }
+
+  resetStatus(): void {
+    this.data.upgradeLevels = {};
+    this.data.partInventory = buildDefaultInventory();
+    this.data.equippedParts = { ...DEFAULT_PRESET.parts };
+    this.save();
+  }
 }

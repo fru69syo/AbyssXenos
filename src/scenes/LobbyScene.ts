@@ -12,14 +12,15 @@ import { STAGES } from '../data/stages';
 import { AudioManager } from '../audio/AudioManager';
 import { GachaManager, GachaResult } from '../managers/GachaManager';
 
-type TabKey = 'shop' | 'upgrade' | 'top' | 'parts' | 'gacha';
-const TAB_ORDER: TabKey[] = ['shop', 'upgrade', 'top', 'parts', 'gacha'];
+type TabKey = 'shop' | 'upgrade' | 'top' | 'parts' | 'gacha' | 'debug';
+const TAB_ORDER: TabKey[] = ['shop', 'upgrade', 'top', 'parts', 'gacha', 'debug'];
 const TAB_LABELS: Record<TabKey, string> = {
   shop: 'ショップ',
   upgrade: 'アップグレード',
   top: 'トップ',
   parts: 'パーツ',
   gacha: 'ガチャ',
+  debug: 'デバッグ',
 };
 const TAB_ICONS: Record<TabKey, string> = {
   shop: '🛒',
@@ -27,6 +28,7 @@ const TAB_ICONS: Record<TabKey, string> = {
   top: '🏠',
   parts: '🔧',
   gacha: '🎰',
+  debug: '🛠',
 };
 
 const NAV_HEIGHT = 66;
@@ -185,12 +187,14 @@ export class LobbyScene extends Phaser.Scene {
       top: this.add.container(0, 0).setVisible(false),
       parts: this.add.container(0, 0).setVisible(false),
       gacha: this.add.container(0, 0).setVisible(false),
+      debug: this.add.container(0, 0).setVisible(false),
     };
     this.createShopTab(this.tabContainers.shop);
     this.createUpgradeTab(this.tabContainers.upgrade);
     this.createTopTab(this.tabContainers.top);
     this.createPartsTab(this.tabContainers.parts);
     this.createGachaTab(this.tabContainers.gacha);
+    this.createDebugTab(this.tabContainers.debug);
   }
 
   // ---------- SHOP tab ----------
@@ -959,6 +963,78 @@ export class LobbyScene extends Phaser.Scene {
     this.tweens.add({
       targets: text, alpha: 0, y: text.y - 50, duration: 1500,
       onComplete: () => text.destroy(),
+    });
+  }
+
+  // ---------- DEBUG tab ----------
+
+  private createDebugTab(container: Phaser.GameObjects.Container): void {
+    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 20, '— デバッグメニュー —', {
+      fontSize: '18px', color: '#aaaacc', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    container.add(title);
+
+    const warn = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 48, '※ 開発用。操作後は即時保存されます', {
+      fontSize: '11px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    container.add(warn);
+
+    const startY = HEADER_HEIGHT + 90;
+    const buttons: { label: string; color: string; bg: string; onPress: () => void }[] = [
+      {
+        label: '🗺  ステージ進行状況を初期化',
+        color: '#ffffff',
+        bg: '#442222',
+        onPress: () => {
+          this.playerData.resetStageProgress();
+          this.scene.restart();
+        },
+      },
+      {
+        label: '⚙  ステータスを初期化',
+        color: '#ffffff',
+        bg: '#442222',
+        onPress: () => {
+          this.playerData.resetStatus();
+          this.scene.restart();
+        },
+      },
+      {
+        label: '💎  ジェム +5000',
+        color: '#44aaff',
+        bg: '#112244',
+        onPress: () => {
+          this.playerData.addGems(5000);
+          this.refreshCurrencyDisplay();
+        },
+      },
+      {
+        label: '🪙  ゴールド +10000',
+        color: '#ffd700',
+        bg: '#333300',
+        onPress: () => {
+          this.playerData.addCoins(10000);
+          this.refreshCurrencyDisplay();
+        },
+      },
+    ];
+
+    buttons.forEach((b, i) => {
+      const y = startY + i * 68;
+      const btn = this.add.text(GAME_WIDTH / 2, y, b.label, {
+        fontSize: '17px',
+        color: b.color,
+        fontFamily: 'monospace',
+        backgroundColor: b.bg,
+        padding: { x: 20, y: 14 },
+        align: 'center',
+        fixedWidth: GAME_WIDTH - 40,
+      }).setOrigin(0.5).setInteractive();
+      btn.on('pointerdown', () => {
+        b.onPress();
+        AudioManager.get().playPowerUp();
+      });
+      container.add(btn);
     });
   }
 

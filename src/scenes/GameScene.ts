@@ -335,16 +335,8 @@ export class GameScene extends Phaser.Scene {
         try {
           const pu = puObj as PowerUp;
           if (!pu.active) return;
-          if (pu.powerUpType === 'coin') {
-            // Gem conversion chance (alchemy evolution)
-            if (this.runState.hasGemConversion && Math.random() < 0.05) {
-              this.playerData.addGems(1);
-              this.showFloatingText(pu.x, pu.y, '💎 +1', '#44aaff');
-            } else {
-              this.runState.coins += Math.ceil(pu.value * this.runState.coinMultiplier);
-            }
-            AudioManager.get().playCoin();
-          } else if (pu.powerUpType === 'heal') {
+          // コインドロップは廃止。敵撃破時に即時加算しているため pu.powerUpType === 'coin' は発火しない
+          if (pu.powerUpType === 'heal') {
             const maxHp = this.runState.overMaxHp ? this.runState.maxHp + 5 : this.runState.maxHp;
             this.runState.hp = Math.min(this.runState.hp + 1, maxHp);
             AudioManager.get().playPowerUp();
@@ -715,11 +707,19 @@ export class GameScene extends Phaser.Scene {
       this.showFloatingText(this.player.x, this.player.y - 25, '+1 HP', '#00ff66');
     }
 
-    // Coin drop (occasional heal)
-    const pu = this.powerUps.getFirstDead(false) as PowerUp | null;
-    if (pu) {
-      const type = Math.random() < 0.15 ? 'heal' : 'coin';
-      pu.spawn(ex, ey, type, coinDrop);
+    // Coin: award immediately on kill. Gem conversion (Alchemy evolution) rolls here.
+    if (this.runState.hasGemConversion && Math.random() < 0.05) {
+      this.playerData.addGems(1);
+      this.showFloatingText(ex, ey, '💎 +1', '#44aaff');
+    } else {
+      this.runState.coins += Math.ceil(coinDrop * this.runState.coinMultiplier);
+    }
+    AudioManager.get().playCoin();
+
+    // Occasional heal drop (still a pickup)
+    if (Math.random() < 0.15) {
+      const pu = this.powerUps.getFirstDead(false) as PowerUp | null;
+      if (pu) pu.spawn(ex, ey, 'heal', 0);
     }
 
     // Gem finder: 2% chance to drop gem
@@ -1026,17 +1026,11 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    // Drop lots of coins
-    for (let i = 0; i < 10; i++) {
-      const pu = this.powerUps.getFirstDead(false) as PowerUp | null;
-      if (pu) {
-        pu.spawn(
-          this.boss.x + Phaser.Math.Between(-40, 40),
-          this.boss.y + Phaser.Math.Between(-30, 30),
-          'coin', 5
-        );
-      }
-    }
+    // Bonus coin payout (immediate)
+    const bossBonus = Math.ceil(50 * this.runState.coinMultiplier);
+    this.runState.coins += bossBonus;
+    this.showFloatingText(this.boss.x, this.boss.y, `🪙 +${bossBonus}`, '#ffd700');
+    AudioManager.get().playCoin();
 
     this.boss.deactivate();
     this.waveManager.onBossDefeated();
@@ -1074,16 +1068,11 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    // ボーナスコイン散布
-    for (let i = 0; i < 5; i++) {
-      const pu = this.powerUps.getFirstDead(false) as PowerUp | null;
-      if (pu) {
-        pu.spawn(
-          this.midBoss.x + Phaser.Math.Between(-30, 30),
-          this.midBoss.y + Phaser.Math.Between(-20, 20),
-          'coin', 3);
-      }
-    }
+    // ボーナスコイン (即時付与)
+    const midBonus = Math.ceil(15 * this.runState.coinMultiplier);
+    this.runState.coins += midBonus;
+    this.showFloatingText(this.midBoss.x, this.midBoss.y, `🪙 +${midBonus}`, '#ffd700');
+    AudioManager.get().playCoin();
 
     // 中ボス確定ドロップ（ガチャチケット）
     const sp = this.powerUps.getFirstDead(false) as PowerUp | null;
