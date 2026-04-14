@@ -39,6 +39,10 @@ export class GameScene extends Phaser.Scene {
   private stageIndex: number = 0;
   /** プレイヤー死亡演出中 (true のあいだ HUD/シーン遷移系を止める) */
   private dying: boolean = false;
+  /** ステージクリア演出に入ったら true。isStageComplete 経路での二重発火を防止 */
+  private stageCleared: boolean = false;
+  /** 現在のステージで boss が一度でも生成されたか (撃破前にステージクリア扱いにさせないガード) */
+  private bossSpawned: boolean = false;
   private particles!: Phaser.GameObjects.Particles.ParticleEmitter;
   // Skill effect timers
   private barrierTimer: number = 0;
@@ -113,6 +117,8 @@ export class GameScene extends Phaser.Scene {
     this.waveManager = new WaveManager(this.stageIndex);
     this.waveTransition = false;
     this.dying = false;
+    this.stageCleared = false;
+    this.bossSpawned = false;
     this.boss = null;
     this.midBoss = null;
 
@@ -515,9 +521,11 @@ export class GameScene extends Phaser.Scene {
     if (this.waveManager.isWaveComplete && !this.waveTransition) {
       if (this.waveManager.isBoss) {
         this.spawnBoss();
-      } else if (this.waveManager.isStageComplete) {
+      } else if (this.waveManager.isStageComplete && this.bossSpawned) {
+        // ボスを実際に出現させて撃破した時だけ stage clear を許可する。
+        // bossSpawned=false で isStageComplete=true になるのは不正 state なので無視。
         this.onStageComplete();
-      } else {
+      } else if (!this.waveManager.isStageComplete) {
         this.onWaveComplete();
       }
     }
@@ -669,6 +677,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onEnemyKilled(enemy: Enemy): void {
+    // 同じ enemy に対して onEnemyKilled が二重に呼ばれるのを防ぐ
+    // (chain damage + direct bullet など複数経路から到達するケース)
+    if (!enemy.active) return;
     // Capture state before deactivating
     const ex = enemy.x;
     const ey = enemy.y;
@@ -1110,6 +1121,7 @@ export class GameScene extends Phaser.Scene {
         warning.destroy();
         this.boss = new Boss(this, this.enemyBullets);
         this.boss.init(this.waveManager.bossData);
+        this.bossSpawned = true;
         this.waveTransition = false;
       },
     });
@@ -1128,6 +1140,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onStageComplete(): void {
+    if (this.stageCleared) return;
+    this.stageCleared = true;
     this.waveTransition = true;
     this.runState.onWaveComplete();
 
