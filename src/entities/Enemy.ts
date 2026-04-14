@@ -131,6 +131,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.burnDamageTimer = 500;
         this.hp -= 1;
         if (this.hp <= 0) {
+          // Burn で死んだ場合も wave 進行のためにカウントを減らす
+          this.scene.events.emit('enemy-escaped', this);
           this.deactivate();
           return;
         }
@@ -218,8 +220,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     if (this.y > GAME_HEIGHT + 50) {
       this.scene.events.emit('enemy-escaped', this);
       this.deactivate();
-    } else if (this.x < -80 || this.x > GAME_WIDTH + 80) {
-      // 横方向に逃げ切った場合も wave 進行のために通知
+    } else if (this.x < -160 || this.x > GAME_WIDTH + 160) {
+      // 横方向に逃げ切った場合も wave 進行のために通知。
+      // side_enter 敵は spawn 時に x=-20 / GAME_WIDTH+20 + 横揺れ ±84px を行うため、
+      // 閾値は spawn 位置 + 揺れ幅より十分広く取る
       this.scene.events.emit('enemy-escaped', this);
       this.deactivate();
     }

@@ -58,6 +58,12 @@ export class WaveManager {
     this.activeEnemies = Math.max(0, this.activeEnemies - 1);
   }
 
+  /** GameScene が実際にエネミーをプールから取り出せた時のみ呼ぶ。
+   *  プール枯渇で spawn がドロップされた場合は呼ばれず、phantom count を防ぐ。 */
+  onEnemySpawned(): void {
+    this.activeEnemies++;
+  }
+
   /** GameScene が中ボスを生成するタイミングで呼ぶ。null なら生成不要。 */
   consumeMidBoss(): BossData | null {
     if (!this.pendingMidBoss) return null;
@@ -194,7 +200,6 @@ export class WaveManager {
           // startDelay 解消直後に 1 体スポーン
           const cmd = g.queue.shift()!;
           out.push(cmd);
-          this.activeEnemies++;
         }
         continue;
       }
@@ -204,7 +209,6 @@ export class WaveManager {
         g.timer -= g.interval;
         const cmd = g.queue.shift()!;
         out.push(cmd);
-        this.activeEnemies++;
       }
     }
 

@@ -188,10 +188,10 @@ export class GameScene extends Phaser.Scene {
   private createEnemyPool(): void {
     this.enemies = this.add.group({
       classType: Enemy,
-      maxSize: 40,
+      maxSize: 80,
       runChildUpdate: true,
     });
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 80; i++) {
       const e = new Enemy(this, -50, -50, 'enemy_1');
       e.deactivate();
       this.enemies.add(e);
@@ -455,7 +455,9 @@ export class GameScene extends Phaser.Scene {
       if (enemy) {
         const def = getEnemyById(spawnCmd.enemyId);
         enemy.spawn(spawnCmd.x, spawnCmd.y, def, spawnCmd.speedBase, hpMul);
+        this.waveManager.onEnemySpawned();
       }
+      // プール枯渇時は silently drop: phantom count を避けるため onEnemySpawned を呼ばない
     }
 
     // 中ボス生成チェック (波開始時に1度だけ)
