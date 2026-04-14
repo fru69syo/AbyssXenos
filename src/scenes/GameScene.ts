@@ -452,8 +452,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Spawn enemies (複数のサブグループからまとめて生成される可能性あり)
-    // 敵 HP はステージ数に比例してスケール (stage 1 = ×1、stage 15 = ×15)
-    const hpMul = this.stageIndex + 1;
+    // 敵 HP はステージ数に比例してスケール (stage 1 = ×3、stage 15 = ×17)
+    // 序盤の敵が弱すぎて手応えが無い問題を解消するため +2 のオフセットを入れる
+    const hpMul = this.stageIndex + 3;
     const spawnCmds = this.waveManager.update(delta);
     for (const spawnCmd of spawnCmds) {
       const enemy = this.enemies.getFirstDead(false) as Enemy | null;
