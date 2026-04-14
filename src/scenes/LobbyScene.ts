@@ -61,6 +61,15 @@ export class LobbyScene extends Phaser.Scene {
   private gachaResultContainer: Phaser.GameObjects.GameObject[] = [];
   private gachaAdUsed: boolean = false;
 
+  // Popup scroll state
+  private popupScrollContainer: Phaser.GameObjects.Container | null = null;
+  private popupScrollMin: number = 0;
+  private popupScrollMax: number = 0;
+  private popupScrollBaseY: number = 0;
+  private popupScrollLastY: number = 0;
+  private popupScrollDragAccum: number = 0;
+  private popupScrollActive: boolean = false;
+
   constructor() {
     super('LobbyScene');
   }
@@ -326,22 +335,59 @@ export class LobbyScene extends Phaser.Scene {
 
     const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
+    // Full-screen dim overlay (not tap-to-close; use ✕ button)
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85)
       .setInteractive().setDepth(10);
-    overlay.on('pointerdown', () => this.closePopup());
     this.popupContainer.push(overlay);
 
-    const title = this.add.text(GAME_WIDTH / 2, 70, `${PART_SLOT_ICONS[slot]} ${PART_SLOT_LABELS[slot]}を選択`, {
-      fontSize: '18px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(11);
+    // Header bar
+    const headerBg = this.add.rectangle(GAME_WIDTH / 2, 35, GAME_WIDTH, 70, 0x001a33, 1)
+      .setStrokeStyle(1, 0x2244aa).setDepth(14);
+    this.popupContainer.push(headerBg);
+
+    const title = this.add.text(GAME_WIDTH / 2, 25, `${PART_SLOT_ICONS[slot]} ${PART_SLOT_LABELS[slot]}を選択`, {
+      fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(15);
     this.popupContainer.push(title);
 
-    const cardHeight = 95;
-    const gap = 6;
-    const startY = 100;
+    const closeBtn = this.add.text(GAME_WIDTH - 12, 12, '✕ 閉じる', {
+      fontSize: '14px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#553333', padding: { x: 8, y: 4 },
+    }).setOrigin(1, 0).setInteractive().setDepth(15);
+    closeBtn.on('pointerup', (p: Phaser.Input.Pointer) => {
+      p.event.stopPropagation();
+      this.closePopup();
+    });
+    this.popupContainer.push(closeBtn);
+
+    // Scroll hint
+    const hint = this.add.text(GAME_WIDTH / 2, 52, '↕ スワイプでスクロール', {
+      fontSize: '10px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(15);
+    this.popupContainer.push(hint);
+
+    // Scrollable viewport
+    const viewTop = 70;
+    const viewBottom = GAME_HEIGHT - 15;
+    const viewHeight = viewBottom - viewTop;
+
+    const scrollContainer = this.add.container(0, viewTop).setDepth(11);
+    this.popupContainer.push(scrollContainer);
+
+    // Geometry mask for clipping
+    const maskGfx = this.make.graphics({ x: 0, y: 0 }, false);
+    maskGfx.fillStyle(0xffffff);
+    maskGfx.fillRect(0, viewTop, GAME_WIDTH, viewHeight);
+    const mask = maskGfx.createGeometryMask();
+    scrollContainer.setMask(mask);
+    // Mask graphics need to be destroyed explicitly
+    this.popupContainer.push(maskGfx as unknown as Phaser.GameObjects.GameObject);
+
+    const cardHeight = 125;
+    const gap = 8;
 
     ownedParts.forEach((item, i) => {
-      const y = startY + i * (cardHeight + gap);
+      const y = i * (cardHeight + gap) + 8;
       const line = getPartLineById(item.lineId);
       if (!line) return;
 
@@ -351,15 +397,15 @@ export class LobbyScene extends Phaser.Scene {
 
       const card = this.add.rectangle(GAME_WIDTH / 2, y + cardHeight / 2, GAME_WIDTH - 30, cardHeight, bgColor)
         .setStrokeStyle(isEquipped ? 2 : 1, Phaser.Display.Color.HexStringToColor(color).color)
-        .setInteractive().setDepth(11);
-      this.popupContainer.push(card);
+        .setInteractive();
+      scrollContainer.add(card);
 
       const rLabel = PART_RARITY_LABELS[item.rarity];
       const partName = line.names[item.rarity];
-      const nameText = this.add.text(22, y + 4, `[${rLabel}] ${partName}`, {
-        fontSize: '13px', color, fontFamily: 'monospace', fontStyle: 'bold',
-      }).setDepth(12);
-      this.popupContainer.push(nameText);
+      const nameText = this.add.text(22, y + 6, `[${rLabel}] ${partName}`, {
+        fontSize: '15px', color, fontFamily: 'monospace', fontStyle: 'bold',
+      });
+      scrollContainer.add(nameText);
 
       const nextRarity = NEXT_RARITY[item.rarity];
       const canEvolve = this.playerData.canEvolve(item.lineId, item.rarity);
@@ -367,10 +413,10 @@ export class LobbyScene extends Phaser.Scene {
       if (nextRarity) {
         countStr += ` (${item.count}/${EVOLUTION_COST})`;
       }
-      const countText = this.add.text(22, y + 20, countStr, {
-        fontSize: '10px', color: canEvolve ? '#00ff88' : '#888888', fontFamily: 'monospace',
-      }).setDepth(12);
-      this.popupContainer.push(countText);
+      const countText = this.add.text(22, y + 28, countStr, {
+        fontSize: '12px', color: canEvolve ? '#00ff88' : '#aaaaaa', fontFamily: 'monospace',
+      });
+      scrollContainer.add(countText);
 
       const bonus = RARITY_BONUS[item.rarity];
       const hp = line.hp + bonus.hp;
@@ -380,18 +426,18 @@ export class LobbyScene extends Phaser.Scene {
       if (line.fireRate > 0) {
         statsStr += ` FR:${line.fireRate - RARITY_FIRERATE_BONUS[item.rarity]}ms`;
       }
-      const statsText = this.add.text(22, y + 33, statsStr, {
-        fontSize: '9px', color: '#777777', fontFamily: 'monospace',
-      }).setDepth(12);
-      this.popupContainer.push(statsText);
+      const statsText = this.add.text(22, y + 46, statsStr, {
+        fontSize: '11px', color: '#bbbbbb', fontFamily: 'monospace',
+      });
+      scrollContainer.add(statsText);
 
-      let abilY = y + 46;
+      let abilY = y + 62;
       if (line.abilityDesc) {
         const abilText = this.add.text(22, abilY, line.abilityDesc, {
-          fontSize: '9px', color: '#aaaacc', fontFamily: 'monospace',
-        }).setDepth(12);
-        this.popupContainer.push(abilText);
-        abilY += 12;
+          fontSize: '11px', color: '#aaaacc', fontFamily: 'monospace',
+        });
+        scrollContainer.add(abilText);
+        abilY += 14;
       }
 
       if (line.bonusAbilities) {
@@ -405,31 +451,32 @@ export class LobbyScene extends Phaser.Scene {
           const ba = line.bonusAbilities[tier.key];
           if (!ba) continue;
           const unlocked = ri >= tier.minRi;
-          const tierColor = unlocked ? PART_RARITY_COLORS[tier.key] : '#444444';
+          const tierColor = unlocked ? PART_RARITY_COLORS[tier.key] : '#555555';
           const prefix = unlocked ? '✦' : '🔒';
           const baText = this.add.text(22, abilY, `${prefix}${tier.label}: ${ba.desc}`, {
-            fontSize: '8px', color: tierColor, fontFamily: 'monospace',
-          }).setDepth(12);
-          this.popupContainer.push(baText);
-          abilY += 11;
+            fontSize: '10px', color: tierColor, fontFamily: 'monospace',
+          });
+          scrollContainer.add(baText);
+          abilY += 13;
         }
       }
 
       if (isEquipped) {
         const eqMark = this.add.text(GAME_WIDTH - 22, y + 8, '装備中', {
-          fontSize: '11px', color: '#00ff88', fontFamily: 'monospace',
-        }).setOrigin(1, 0).setDepth(12);
-        this.popupContainer.push(eqMark);
+          fontSize: '13px', color: '#00ff88', fontFamily: 'monospace', fontStyle: 'bold',
+        }).setOrigin(1, 0);
+        scrollContainer.add(eqMark);
       }
 
       if (canEvolve && nextRarity) {
-        const evolveBtn = this.add.text(GAME_WIDTH - 22, y + 30, `進化→${PART_RARITY_LABELS[nextRarity]}`, {
-          fontSize: '11px', color: '#000000', fontFamily: 'monospace', fontStyle: 'bold',
-          backgroundColor: '#00ff88', padding: { x: 6, y: 3 },
-        }).setOrigin(1, 0).setDepth(13).setInteractive();
-        this.popupContainer.push(evolveBtn);
+        const evolveBtn = this.add.text(GAME_WIDTH - 22, y + 32, `進化→${PART_RARITY_LABELS[nextRarity]}`, {
+          fontSize: '13px', color: '#000000', fontFamily: 'monospace', fontStyle: 'bold',
+          backgroundColor: '#00ff88', padding: { x: 8, y: 4 },
+        }).setOrigin(1, 0).setInteractive();
+        scrollContainer.add(evolveBtn);
 
-        evolveBtn.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        evolveBtn.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+          if (this.popupScrollDragAccum > 8) return;
           pointer.event.stopPropagation();
           this.playerData.evolvePart(item.lineId, item.rarity);
           this.closePopup();
@@ -439,17 +486,34 @@ export class LobbyScene extends Phaser.Scene {
         });
       }
 
-      card.on('pointerdown', () => {
+      card.on('pointerup', () => {
+        if (this.popupScrollDragAccum > 8) return;
         this.playerData.equipPart(slot, item.key);
         this.closePopup();
         this.updatePartsDisplay();
       });
     });
+
+    // Compute scroll bounds
+    const contentHeight = ownedParts.length * (cardHeight + gap) + 16;
+    const overflow = Math.max(0, contentHeight - viewHeight);
+    this.popupScrollBaseY = viewTop;
+    this.popupScrollMin = viewTop - overflow; // container.y can go this low when scrolled down
+    this.popupScrollMax = viewTop;
+    this.popupScrollContainer = scrollContainer;
   }
 
   private closePopup(): void {
-    for (const obj of this.popupContainer) obj.destroy();
+    for (const obj of this.popupContainer) {
+      // Graphics used as mask may not be a proper DisplayList child
+      if (obj && typeof (obj as Phaser.GameObjects.GameObject).destroy === 'function') {
+        try { obj.destroy(); } catch (_e) { /* noop */ }
+      }
+    }
     this.popupContainer = [];
+    this.popupScrollContainer = null;
+    this.popupScrollActive = false;
+    this.popupScrollDragAccum = 0;
   }
 
   // ---------- TOP tab: stage carousel ----------
@@ -638,15 +702,38 @@ export class LobbyScene extends Phaser.Scene {
 
   private setupSwipeInput(): void {
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Popup scroll takes priority when modal is open
+      if (this.popupScrollContainer) {
+        this.popupScrollActive = true;
+        this.popupScrollLastY = pointer.y;
+        this.popupScrollDragAccum = 0;
+        return;
+      }
       if (this.currentTab !== 'top') return;
-      if (this.popupContainer.length > 0) return;
       // Avoid triggering when clicking within nav area or header
       if (pointer.y < HEADER_HEIGHT + 60) return;
       if (pointer.y > GAME_HEIGHT - NAV_HEIGHT - 70) return;
       this.swipeActive = true;
       this.swipeStartX = pointer.x;
     });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.popupScrollActive || !this.popupScrollContainer) return;
+      if (!pointer.isDown) return;
+      const dy = pointer.y - this.popupScrollLastY;
+      this.popupScrollLastY = pointer.y;
+      this.popupScrollDragAccum += Math.abs(dy);
+      const c = this.popupScrollContainer;
+      c.y = Phaser.Math.Clamp(c.y + dy, this.popupScrollMin, this.popupScrollMax);
+    });
+
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (this.popupScrollActive) {
+        this.popupScrollActive = false;
+        // Reset drag accum shortly after so card pointerup handlers see the drag flag
+        this.time.delayedCall(50, () => { this.popupScrollDragAccum = 0; });
+        return;
+      }
       if (!this.swipeActive) return;
       this.swipeActive = false;
       if (this.currentTab !== 'top') return;
