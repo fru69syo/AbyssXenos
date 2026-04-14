@@ -116,6 +116,11 @@ export class GameScene extends Phaser.Scene {
     this.boss = null;
     this.midBoss = null;
 
+    // Scene 再起動時にハンドラが重複登録されるのを防止
+    this.events.off('enemy-escaped');
+    this.events.off('enemy-bullet-explode');
+    this.events.off('enemy-self-destruct');
+
     // 画面外に逃げた敵もウェーブカウンタから差し引く
     this.events.on('enemy-escaped', () => {
       this.waveManager.onEnemyDestroyed();
@@ -1188,5 +1193,9 @@ export class GameScene extends Phaser.Scene {
     for (const orb of this.orbitals) orb.destroy();
     this.orbitals = [];
     if (this.cloneSprite) { this.cloneSprite.destroy(); this.cloneSprite = null; }
+    // Scene events は再利用されるため、カスタムハンドラを確実に除去
+    this.events.off('enemy-escaped');
+    this.events.off('enemy-bullet-explode');
+    this.events.off('enemy-self-destruct');
   }
 }
