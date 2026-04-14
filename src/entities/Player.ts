@@ -172,7 +172,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.runState.hasDamageCap) dmg = 1;
 
     this.runState.hp -= dmg;
-    this.setInvincible(1000);
+    this.setInvincible(50);
     AudioManager.get().playDamage();
 
     // Thorns: retaliatory bullet
