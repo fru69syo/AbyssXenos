@@ -29,8 +29,8 @@ const TAB_ICONS: Record<TabKey, string> = {
   gacha: '🎰',
 };
 
-const NAV_HEIGHT = 60;
-const HEADER_HEIGHT = 50;
+const NAV_HEIGHT = 66;
+const HEADER_HEIGHT = 56;
 
 export class LobbyScene extends Phaser.Scene {
   private playerData!: PlayerData;
@@ -69,6 +69,7 @@ export class LobbyScene extends Phaser.Scene {
   private popupScrollLastY: number = 0;
   private popupScrollDragAccum: number = 0;
   private popupScrollActive: boolean = false;
+  private popupOpenedAt: number = 0;
 
   constructor() {
     super('LobbyScene');
@@ -117,38 +118,38 @@ export class LobbyScene extends Phaser.Scene {
     bar.setDepth(1);
 
     this.coinText = this.add.text(12, 8, `🪙 ${this.playerData.data.coins}`, {
-      fontSize: '14px', color: '#ffd700', fontFamily: 'monospace',
+      fontSize: '16px', color: '#ffd700', fontFamily: 'monospace',
     }).setDepth(2);
 
-    this.gemText = this.add.text(12, 28, `💎 ${this.playerData.data.gems}`, {
-      fontSize: '14px', color: '#44aaff', fontFamily: 'monospace',
+    this.gemText = this.add.text(12, 32, `💎 ${this.playerData.data.gems}`, {
+      fontSize: '16px', color: '#44aaff', fontFamily: 'monospace',
     }).setDepth(2);
 
-    this.add.text(GAME_WIDTH / 2, 8, 'LOBBY', {
-      fontSize: '18px', color: COLORS.UI_ACCENT, fontFamily: 'monospace', fontStyle: 'bold',
+    this.add.text(GAME_WIDTH / 2, 12, 'LOBBY', {
+      fontSize: '22px', color: COLORS.UI_ACCENT, fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5, 0).setDepth(2);
 
-    // Title back button (top-right area, below audio toggles)
+    // Title back button (top-right area, above audio toggles)
     const backBtn = this.add.text(GAME_WIDTH - 12, 8, '← タイトル', {
-      fontSize: '11px', color: '#888888', fontFamily: 'monospace',
+      fontSize: '13px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(1, 0).setInteractive().setDepth(2);
     backBtn.on('pointerdown', () => {
       this.scene.start('TitleScene');
     });
 
     // Audio toggles below back button
-    this.createAudioToggles(GAME_WIDTH - 12, 26);
+    this.createAudioToggles(GAME_WIDTH - 12, 30);
   }
 
   private createAudioToggles(rightX: number, y: number): void {
     const am = AudioManager.get();
     const seBtn = this.add.text(rightX, y, '', {
-      fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
-      backgroundColor: '#222244', padding: { x: 4, y: 2 },
+      fontSize: '12px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#222244', padding: { x: 5, y: 2 },
     }).setOrigin(1, 0).setInteractive().setDepth(2);
-    const bgmBtn = this.add.text(rightX - 56, y, '', {
-      fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
-      backgroundColor: '#222244', padding: { x: 4, y: 2 },
+    const bgmBtn = this.add.text(rightX - 68, y, '', {
+      fontSize: '12px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#222244', padding: { x: 5, y: 2 },
     }).setOrigin(1, 0).setInteractive().setDepth(2);
 
     const refresh = () => {
@@ -196,15 +197,15 @@ export class LobbyScene extends Phaser.Scene {
 
   private createShopTab(container: Phaser.GameObjects.Container): void {
     const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 30, '🛒 ショップ', {
-      fontSize: '22px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
+      fontSize: '26px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
 
     const msg = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, '準備中', {
-      fontSize: '28px', color: '#666666', fontFamily: 'monospace',
+      fontSize: '34px', color: '#666666', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    const sub = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '近日実装予定', {
-      fontSize: '14px', color: '#888888', fontFamily: 'monospace',
+    const sub = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30, '近日実装予定', {
+      fontSize: '18px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
     container.add([title, msg, sub]);
@@ -214,32 +215,32 @@ export class LobbyScene extends Phaser.Scene {
 
   private createUpgradeTab(container: Phaser.GameObjects.Container): void {
     const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 20, '— 恒久アップグレード —', {
-      fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
+      fontSize: '18px', color: '#aaaacc', fontFamily: 'monospace',
     }).setOrigin(0.5);
     container.add(title);
 
-    const startY = HEADER_HEIGHT + 55;
+    const startY = HEADER_HEIGHT + 60;
     UPGRADES.forEach((upg, i) => {
-      const y = startY + i * 58;
+      const y = startY + i * 68;
       const level = this.playerData.getUpgradeLevel(upg.id);
       const cost = Math.floor(upg.baseCost * Math.pow(upg.costMultiplier, level));
       const maxed = level >= upg.maxLevel;
 
       const nameText = this.add.text(15, y, upg.name, {
-        fontSize: '14px', color: '#ffffff', fontFamily: 'monospace',
+        fontSize: '17px', color: '#ffffff', fontFamily: 'monospace',
       });
 
-      const descText = this.add.text(15, y + 20, `Lv.${level}/${upg.maxLevel}  ${upg.description}`, {
-        fontSize: '10px', color: '#888888', fontFamily: 'monospace', wordWrap: { width: GAME_WIDTH - 100 },
+      const descText = this.add.text(15, y + 24, `Lv.${level}/${upg.maxLevel}  ${upg.description}`, {
+        fontSize: '12px', color: '#888888', fontFamily: 'monospace', wordWrap: { width: GAME_WIDTH - 110 },
       });
 
       const btnText = maxed ? 'MAX' : `🪙${cost}`;
-      const btn = this.add.text(GAME_WIDTH - 20, y + 14, btnText, {
-        fontSize: '13px',
+      const btn = this.add.text(GAME_WIDTH - 20, y + 18, btnText, {
+        fontSize: '16px',
         color: maxed ? '#666666' : '#ffd700',
         fontFamily: 'monospace',
         backgroundColor: maxed ? '#222222' : '#333300',
-        padding: { x: 8, y: 4 },
+        padding: { x: 10, y: 6 },
       }).setOrigin(1, 0.5).setInteractive();
 
       if (!maxed) {
@@ -259,41 +260,41 @@ export class LobbyScene extends Phaser.Scene {
 
   private createPartsTab(container: Phaser.GameObjects.Container): void {
     const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 20, '— パーツ装備 —', {
-      fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
+      fontSize: '18px', color: '#aaaacc', fontFamily: 'monospace',
     }).setOrigin(0.5);
     container.add(title);
 
-    const startY = HEADER_HEIGHT + 50;
-    const rowHeight = 36;
+    const startY = HEADER_HEIGHT + 55;
+    const rowHeight = 42;
 
     PART_SLOTS.forEach((slot, i) => {
       const y = startY + i * rowHeight;
 
       const iconText = this.add.text(15, y, PART_SLOT_ICONS[slot], {
-        fontSize: '16px', color: '#888888', fontFamily: 'monospace',
+        fontSize: '20px', color: '#888888', fontFamily: 'monospace',
       });
 
-      const labelText = this.add.text(40, y + 2, PART_SLOT_LABELS[slot], {
-        fontSize: '12px', color: '#666666', fontFamily: 'monospace',
+      const labelText = this.add.text(44, y + 4, PART_SLOT_LABELS[slot], {
+        fontSize: '14px', color: '#666666', fontFamily: 'monospace',
       });
 
-      const partText = this.add.text(120, y + 2, '', {
-        fontSize: '13px', color: '#ffffff', fontFamily: 'monospace',
+      const partText = this.add.text(130, y + 4, '', {
+        fontSize: '16px', color: '#ffffff', fontFamily: 'monospace',
       }).setInteractive();
 
-      partText.on('pointerdown', () => this.openPartSelect(slot));
+      partText.on('pointerup', () => this.openPartSelect(slot));
       this.slotTexts.push(partText);
 
       container.add([iconText, labelText, partText]);
     });
 
-    this.statsText = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 14, '', {
-      fontSize: '12px', color: '#aaaaaa', fontFamily: 'monospace', align: 'center',
+    this.statsText = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 16, '', {
+      fontSize: '15px', color: '#aaaaaa', fontFamily: 'monospace', align: 'center',
     }).setOrigin(0.5, 0);
     container.add(this.statsText);
 
-    const hint = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 44, 'パーツ名をタップして装備変更・進化', {
-      fontSize: '10px', color: '#666666', fontFamily: 'monospace',
+    const hint = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 48, 'パーツ名をタップして装備変更・進化', {
+      fontSize: '12px', color: '#666666', fontFamily: 'monospace',
     }).setOrigin(0.5, 0);
     container.add(hint);
 
@@ -329,6 +330,7 @@ export class LobbyScene extends Phaser.Scene {
 
   private openPartSelect(slot: PartSlot): void {
     this.closePopup();
+    this.popupOpenedAt = performance.now();
 
     const ownedParts = this.playerData.getOwnedPartsForSlot(slot);
     if (ownedParts.length === 0) return;
@@ -476,6 +478,7 @@ export class LobbyScene extends Phaser.Scene {
         scrollContainer.add(evolveBtn);
 
         evolveBtn.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+          if (performance.now() - this.popupOpenedAt < 200) return;
           if (this.popupScrollDragAccum > 8) return;
           pointer.event.stopPropagation();
           this.playerData.evolvePart(item.lineId, item.rarity);
@@ -487,6 +490,7 @@ export class LobbyScene extends Phaser.Scene {
       }
 
       card.on('pointerup', () => {
+        if (performance.now() - this.popupOpenedAt < 200) return;
         if (this.popupScrollDragAccum > 8) return;
         this.playerData.equipPart(slot, item.key);
         this.closePopup();
@@ -522,12 +526,12 @@ export class LobbyScene extends Phaser.Scene {
     const highest = this.playerData.data.highestStage;
 
     const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 15, '— ステージ選択 —', {
-      fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
+      fontSize: '18px', color: '#aaaacc', fontFamily: 'monospace',
     }).setOrigin(0.5);
     container.add(title);
 
-    const subtitle = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 38, `最高到達: ステージ ${highest}`, {
-      fontSize: '11px', color: '#888888', fontFamily: 'monospace',
+    const subtitle = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 40, `最高到達: ステージ ${highest}`, {
+      fontSize: '13px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
     container.add(subtitle);
 
@@ -535,7 +539,7 @@ export class LobbyScene extends Phaser.Scene {
     this.carouselRoot = this.add.container(0, 0);
     container.add(this.carouselRoot);
 
-    const cardCenterY = HEADER_HEIGHT + 220;
+    const cardCenterY = HEADER_HEIGHT + 230;
     STAGES.forEach((_stage, i) => {
       const card = this.createStageCard(i, cardCenterY);
       this.carouselRoot.add(card);
@@ -544,32 +548,32 @@ export class LobbyScene extends Phaser.Scene {
     this.layoutCarousel(false);
 
     // Arrows + indicator
-    const arrowY = HEADER_HEIGHT + 395;
+    const arrowY = HEADER_HEIGHT + 415;
     const leftArrow = this.add.text(30, arrowY, '◀', {
-      fontSize: '28px', color: '#ffffff', fontFamily: 'monospace',
-      backgroundColor: '#223344', padding: { x: 10, y: 4 },
+      fontSize: '30px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#223344', padding: { x: 12, y: 6 },
     }).setOrigin(0.5).setInteractive();
     leftArrow.on('pointerdown', () => this.changeStage(-1));
 
     const rightArrow = this.add.text(GAME_WIDTH - 30, arrowY, '▶', {
-      fontSize: '28px', color: '#ffffff', fontFamily: 'monospace',
-      backgroundColor: '#223344', padding: { x: 10, y: 4 },
+      fontSize: '30px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#223344', padding: { x: 12, y: 6 },
     }).setOrigin(0.5).setInteractive();
     rightArrow.on('pointerdown', () => this.changeStage(1));
 
     this.stageIndicatorText = this.add.text(GAME_WIDTH / 2, arrowY, '', {
-      fontSize: '16px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+      fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
 
     container.add([leftArrow, rightArrow, this.stageIndicatorText]);
 
     // Launch button
-    this.launchBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 50, '⚔  出撃  ⚔', {
-      fontSize: '24px',
+    this.launchBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 60, '⚔  出撃  ⚔', {
+      fontSize: '28px',
       color: '#ffffff',
       fontFamily: 'monospace',
       backgroundColor: '#004466',
-      padding: { x: 40, y: 12 },
+      padding: { x: 44, y: 14 },
     }).setOrigin(0.5).setInteractive();
 
     this.launchBtn.on('pointerover', () => {
@@ -606,42 +610,42 @@ export class LobbyScene extends Phaser.Scene {
 
     const bgColor = unlocked ? 0x112244 : 0x111111;
     const borderColor = unlocked ? 0x4488ff : 0x333333;
-    const bg = this.add.rectangle(0, 0, GAME_WIDTH - 40, 300, bgColor)
+    const bg = this.add.rectangle(0, 0, GAME_WIDTH - 40, 320, bgColor)
       .setStrokeStyle(2, borderColor);
 
     const nameColor = unlocked ? '#ffffff' : '#555555';
-    const stageLabel = this.add.text(0, -110, `STAGE ${stageNum}`, {
-      fontSize: '22px', color: unlocked ? '#ffd700' : '#555555', fontFamily: 'monospace', fontStyle: 'bold',
+    const stageLabel = this.add.text(0, -118, `STAGE ${stageNum}`, {
+      fontSize: '26px', color: unlocked ? '#ffd700' : '#555555', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    const nameText = this.add.text(0, -70, stage.name, {
-      fontSize: '18px', color: nameColor, fontFamily: 'monospace',
+    const nameText = this.add.text(0, -75, stage.name, {
+      fontSize: '22px', color: nameColor, fontFamily: 'monospace',
     }).setOrigin(0.5);
 
     const waveText = this.add.text(0, -20, `Wave ${stage.waves.length} + Boss`, {
-      fontSize: '14px', color: unlocked ? '#aaaacc' : '#444444', fontFamily: 'monospace',
+      fontSize: '17px', color: unlocked ? '#aaaacc' : '#444444', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    const bossText = this.add.text(0, 10, `Boss HP ${stage.boss.hp}`, {
-      fontSize: '14px', color: unlocked ? '#ff6688' : '#444444', fontFamily: 'monospace',
+    const bossText = this.add.text(0, 14, `Boss HP ${stage.boss.hp}`, {
+      fontSize: '17px', color: unlocked ? '#ff6688' : '#444444', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
     const hpMul = index + 1;
-    const mulText = this.add.text(0, 40, `敵HP ×${hpMul}`, {
-      fontSize: '12px', color: unlocked ? '#88aadd' : '#333333', fontFamily: 'monospace',
+    const mulText = this.add.text(0, 46, `敵HP ×${hpMul}`, {
+      fontSize: '14px', color: unlocked ? '#88aadd' : '#333333', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
     card.add([bg, stageLabel, nameText, waveText, bossText, mulText]);
 
     if (!unlocked) {
-      const lock = this.add.text(0, 90, '🔒 LOCKED', {
-        fontSize: '18px', color: '#666666', fontFamily: 'monospace',
+      const lock = this.add.text(0, 98, '🔒 LOCKED', {
+        fontSize: '22px', color: '#666666', fontFamily: 'monospace',
       }).setOrigin(0.5);
       card.add(lock);
       card.setAlpha(0.5);
     } else if (stageNum <= highest) {
-      const cleared = this.add.text(0, 90, '✓ クリア済み', {
-        fontSize: '14px', color: '#00ff88', fontFamily: 'monospace',
+      const cleared = this.add.text(0, 98, '✓ クリア済み', {
+        fontSize: '16px', color: '#00ff88', fontFamily: 'monospace',
       }).setOrigin(0.5);
       card.add(cleared);
     }
@@ -747,32 +751,32 @@ export class LobbyScene extends Phaser.Scene {
   // ---------- GACHA tab ----------
 
   private createGachaTab(container: Phaser.GameObjects.Container): void {
-    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 15, '🎰 パーツガチャ', {
-      fontSize: '22px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
+    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 18, '🎰 パーツガチャ', {
+      fontSize: '26px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.gachaGemText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 50, `💎 ${this.playerData.data.gems}`, {
-      fontSize: '18px', color: '#44aaff', fontFamily: 'monospace',
+    this.gachaGemText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 56, `💎 ${this.playerData.data.gems}`, {
+      fontSize: '22px', color: '#44aaff', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    this.gachaPityText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 74, this.getPityText(), {
-      fontSize: '12px', color: '#888888', fontFamily: 'monospace',
+    this.gachaPityText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 84, this.getPityText(), {
+      fontSize: '15px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    const rateText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 94, '排出: N 55%  R 33%  SR 12%', {
-      fontSize: '11px', color: '#666666', fontFamily: 'monospace',
+    const rateText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 108, '排出: N 55%  R 33%  SR 12%', {
+      fontSize: '13px', color: '#666666', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    const noteText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 110, '50回で SR確定 / 同パーツ3個で進化!', {
-      fontSize: '10px', color: '#886644', fontFamily: 'monospace',
+    const noteText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 128, '50回で SR確定 / 同パーツ3個で進化!', {
+      fontSize: '12px', color: '#886644', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    const pullBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 90, `ガチャを引く (💎${this.gachaManager.getCost()})`, {
-      fontSize: '20px',
+    const pullBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 100, `ガチャを引く (💎${this.gachaManager.getCost()})`, {
+      fontSize: '24px',
       color: '#ffffff',
       fontFamily: 'monospace',
       backgroundColor: '#553300',
-      padding: { x: 26, y: 10 },
+      padding: { x: 30, y: 12 },
     }).setOrigin(0.5).setInteractive();
 
     pullBtn.on('pointerdown', () => this.doGachaPull());
@@ -784,12 +788,12 @@ export class LobbyScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    this.gachaAdBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 30, '📺 広告で無料ガチャ', {
-      fontSize: '16px',
+    this.gachaAdBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 36, '📺 広告で無料ガチャ', {
+      fontSize: '20px',
       color: '#ffaa00',
       fontFamily: 'monospace',
       backgroundColor: '#332200',
-      padding: { x: 22, y: 8 },
+      padding: { x: 26, y: 10 },
     }).setOrigin(0.5).setInteractive();
 
     this.gachaAdBtn.on('pointerdown', () => {
@@ -827,36 +831,36 @@ export class LobbyScene extends Phaser.Scene {
     const slotLabel = PART_SLOT_LABELS[line.slot];
     const partName = line.names[rarity];
 
-    const centerY = HEADER_HEIGHT + 280;
+    const centerY = HEADER_HEIGHT + 300;
 
     if (rarity === 'sr') this.cameras.main.flash(400, 200, 100, 255);
     else if (rarity === 'r') this.cameras.main.flash(200, 80, 120, 255);
 
-    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 60, 260, bgColor)
+    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 60, 290, bgColor)
       .setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(color).color);
     this.tabContainers.gacha.add(card);
     this.gachaResultContainer.push(card);
 
-    const rarityText = this.add.text(GAME_WIDTH / 2, centerY - 95, label, {
-      fontSize: '20px', color, fontFamily: 'monospace', fontStyle: 'bold',
+    const rarityText = this.add.text(GAME_WIDTH / 2, centerY - 110, label, {
+      fontSize: '22px', color, fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.tabContainers.gacha.add(rarityText);
     this.gachaResultContainer.push(rarityText);
 
-    const slotText = this.add.text(GAME_WIDTH / 2, centerY - 70, `${slotIcon} ${slotLabel}`, {
-      fontSize: '12px', color: '#888888', fontFamily: 'monospace',
+    const slotText = this.add.text(GAME_WIDTH / 2, centerY - 82, `${slotIcon} ${slotLabel}`, {
+      fontSize: '14px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
     this.tabContainers.gacha.add(slotText);
     this.gachaResultContainer.push(slotText);
 
-    const icon = this.add.text(GAME_WIDTH / 2, centerY - 35, slotIcon, {
-      fontSize: '40px', color: '#' + line.color.toString(16).padStart(6, '0'),
+    const icon = this.add.text(GAME_WIDTH / 2, centerY - 42, slotIcon, {
+      fontSize: '44px', color: '#' + line.color.toString(16).padStart(6, '0'),
     }).setOrigin(0.5);
     this.tabContainers.gacha.add(icon);
     this.gachaResultContainer.push(icon);
 
     const nameText = this.add.text(GAME_WIDTH / 2, centerY + 5, partName, {
-      fontSize: '17px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+      fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.tabContainers.gacha.add(nameText);
     this.gachaResultContainer.push(nameText);
@@ -865,8 +869,8 @@ export class LobbyScene extends Phaser.Scene {
     let countStr = `所持: ${newCount}個`;
     if (nextRarity) countStr += ` (進化まで ${newCount}/${EVOLUTION_COST})`;
     const canEvolve = newCount >= EVOLUTION_COST && nextRarity;
-    const countText = this.add.text(GAME_WIDTH / 2, centerY + 30, countStr, {
-      fontSize: '12px',
+    const countText = this.add.text(GAME_WIDTH / 2, centerY + 33, countStr, {
+      fontSize: '14px',
       color: canEvolve ? '#00ff88' : '#aaaaaa',
       fontFamily: 'monospace',
       fontStyle: canEvolve ? 'bold' : 'normal',
@@ -875,8 +879,8 @@ export class LobbyScene extends Phaser.Scene {
     this.gachaResultContainer.push(countText);
 
     if (canEvolve) {
-      const evolveHint = this.add.text(GAME_WIDTH / 2, centerY + 48, '✨ 進化可能! パーツタブで進化', {
-        fontSize: '11px', color: '#00ff88', fontFamily: 'monospace',
+      const evolveHint = this.add.text(GAME_WIDTH / 2, centerY + 53, '✨ 進化可能! パーツタブで進化', {
+        fontSize: '13px', color: '#00ff88', fontFamily: 'monospace',
       }).setOrigin(0.5);
       this.tabContainers.gacha.add(evolveHint);
       this.gachaResultContainer.push(evolveHint);
@@ -889,20 +893,20 @@ export class LobbyScene extends Phaser.Scene {
     const spd = line.speed + bonus.speed;
     let statsStr = `HP:${hp} ATK:${atk} SPD:${spd}`;
     if (line.fireRate > 0) statsStr += ` FR:${line.fireRate - RARITY_FIRERATE_BONUS[rarity]}ms`;
-    const statsText = this.add.text(GAME_WIDTH / 2, centerY + 68, statsStr, {
-      fontSize: '11px', color: '#888888', fontFamily: 'monospace',
+    const statsText = this.add.text(GAME_WIDTH / 2, centerY + 75, statsStr, {
+      fontSize: '13px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
     this.tabContainers.gacha.add(statsText);
     this.gachaResultContainer.push(statsText);
 
-    let nextY = centerY + 85;
+    let nextY = centerY + 94;
     if (line.abilityDesc) {
       const abilityText = this.add.text(GAME_WIDTH / 2, nextY, line.abilityDesc, {
-        fontSize: '11px', color, fontFamily: 'monospace',
+        fontSize: '13px', color, fontFamily: 'monospace',
       }).setOrigin(0.5);
       this.tabContainers.gacha.add(abilityText);
       this.gachaResultContainer.push(abilityText);
-      nextY += 14;
+      nextY += 16;
     }
 
     if (line.bonusAbilities) {
@@ -919,11 +923,11 @@ export class LobbyScene extends Phaser.Scene {
         const tierColor = unlocked ? PART_RARITY_COLORS[tier.key] : '#444444';
         const prefix = unlocked ? '✦' : '🔒';
         const baText = this.add.text(GAME_WIDTH / 2, nextY, `${prefix} ${tier.label}: ${ba.desc}`, {
-          fontSize: '9px', color: tierColor, fontFamily: 'monospace',
+          fontSize: '11px', color: tierColor, fontFamily: 'monospace',
         }).setOrigin(0.5);
         this.tabContainers.gacha.add(baText);
         this.gachaResultContainer.push(baText);
-        nextY += 12;
+        nextY += 14;
       }
     }
 
@@ -948,8 +952,8 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private showGachaMessage(msg: string, color: string): void {
-    const text = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 280, msg, {
-      fontSize: '20px', color, fontFamily: 'monospace', fontStyle: 'bold',
+    const text = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 300, msg, {
+      fontSize: '22px', color, fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
     this.tabContainers.gacha.add(text);
     this.tweens.add({
@@ -976,12 +980,12 @@ export class LobbyScene extends Phaser.Scene {
         .setInteractive()
         .setDepth(6);
 
-      const iconText = this.add.text(cx, cy - 12, TAB_ICONS[key], {
-        fontSize: '18px', fontFamily: 'monospace',
+      const iconText = this.add.text(cx, cy - 14, TAB_ICONS[key], {
+        fontSize: '22px', fontFamily: 'monospace',
       }).setOrigin(0.5).setDepth(7);
 
-      const labelText = this.add.text(cx, cy + 12, TAB_LABELS[key], {
-        fontSize: '9px', color: '#ffffff', fontFamily: 'monospace',
+      const labelText = this.add.text(cx, cy + 15, TAB_LABELS[key], {
+        fontSize: '11px', color: '#ffffff', fontFamily: 'monospace',
       }).setOrigin(0.5).setDepth(7);
 
       rect.on('pointerdown', () => this.setTab(key));
