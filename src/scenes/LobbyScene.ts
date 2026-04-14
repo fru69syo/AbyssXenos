@@ -3,13 +3,14 @@ import { PlayerData } from '../managers/PlayerData';
 import {
   PartSlot, PART_SLOTS, PART_SLOT_LABELS, PART_SLOT_ICONS,
   getPartLineById, calcPartStats, parsePartKey,
-  PART_RARITY_COLORS, PART_RARITY_LABELS,
+  PART_RARITY_COLORS, PART_RARITY_LABELS, PART_RARITY_BG,
   RARITY_BONUS, RARITY_FIRERATE_BONUS,
   EVOLUTION_COST, NEXT_RARITY, PART_RARITY_ORDER,
 } from '../data/parts';
 import { UPGRADES } from '../data/upgrades';
 import { STAGES } from '../data/stages';
 import { AudioManager } from '../audio/AudioManager';
+import { GachaManager, GachaResult } from '../managers/GachaManager';
 
 type TabKey = 'shop' | 'upgrade' | 'top' | 'parts' | 'gacha';
 const TAB_ORDER: TabKey[] = ['shop', 'upgrade', 'top', 'parts', 'gacha'];
@@ -39,7 +40,7 @@ export class LobbyScene extends Phaser.Scene {
   private statsText!: Phaser.GameObjects.Text;
   private popupContainer: Phaser.GameObjects.GameObject[] = [];
 
-  private tabContainers!: Record<'shop' | 'upgrade' | 'top' | 'parts', Phaser.GameObjects.Container>;
+  private tabContainers!: Record<TabKey, Phaser.GameObjects.Container>;
   private currentTab: TabKey = 'top';
   private navButtons: { rect: Phaser.GameObjects.Rectangle; iconText: Phaser.GameObjects.Text; labelText: Phaser.GameObjects.Text; key: TabKey }[] = [];
 
@@ -51,6 +52,14 @@ export class LobbyScene extends Phaser.Scene {
   private launchBtn!: Phaser.GameObjects.Text;
   private swipeStartX: number = 0;
   private swipeActive: boolean = false;
+
+  // Gacha state
+  private gachaManager!: GachaManager;
+  private gachaGemText!: Phaser.GameObjects.Text;
+  private gachaPityText!: Phaser.GameObjects.Text;
+  private gachaAdBtn!: Phaser.GameObjects.Text;
+  private gachaResultContainer: Phaser.GameObjects.GameObject[] = [];
+  private gachaAdUsed: boolean = false;
 
   constructor() {
     super('LobbyScene');
@@ -64,6 +73,9 @@ export class LobbyScene extends Phaser.Scene {
     this.popupContainer = [];
     this.stageCards = [];
     this.navButtons = [];
+    this.gachaResultContainer = [];
+    this.gachaAdUsed = false;
+    this.gachaManager = new GachaManager();
 
     const highest = this.playerData.data.highestStage;
     this.selectedStageIndex = Phaser.Math.Clamp(highest, 0, STAGES.length - 1);
@@ -162,11 +174,13 @@ export class LobbyScene extends Phaser.Scene {
       upgrade: this.add.container(0, 0).setVisible(false),
       top: this.add.container(0, 0).setVisible(false),
       parts: this.add.container(0, 0).setVisible(false),
+      gacha: this.add.container(0, 0).setVisible(false),
     };
     this.createShopTab(this.tabContainers.shop);
     this.createUpgradeTab(this.tabContainers.upgrade);
     this.createTopTab(this.tabContainers.top);
     this.createPartsTab(this.tabContainers.parts);
+    this.createGachaTab(this.tabContainers.gacha);
   }
 
   // ---------- SHOP tab ----------
@@ -643,6 +657,220 @@ export class LobbyScene extends Phaser.Scene {
     });
   }
 
+  // ---------- GACHA tab ----------
+
+  private createGachaTab(container: Phaser.GameObjects.Container): void {
+    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 15, '🎰 パーツガチャ', {
+      fontSize: '22px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    this.gachaGemText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 50, `💎 ${this.playerData.data.gems}`, {
+      fontSize: '18px', color: '#44aaff', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    this.gachaPityText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 74, this.getPityText(), {
+      fontSize: '12px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    const rateText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 94, '排出: N 55%  R 33%  SR 12%', {
+      fontSize: '11px', color: '#666666', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    const noteText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 110, '50回で SR確定 / 同パーツ3個で進化!', {
+      fontSize: '10px', color: '#886644', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    const pullBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 90, `ガチャを引く (💎${this.gachaManager.getCost()})`, {
+      fontSize: '20px',
+      color: '#ffffff',
+      fontFamily: 'monospace',
+      backgroundColor: '#553300',
+      padding: { x: 26, y: 10 },
+    }).setOrigin(0.5).setInteractive();
+
+    pullBtn.on('pointerdown', () => this.doGachaPull());
+
+    this.tweens.add({
+      targets: pullBtn,
+      scaleX: 1.04, scaleY: 1.04,
+      duration: 700, yoyo: true, repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    this.gachaAdBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 30, '📺 広告で無料ガチャ', {
+      fontSize: '16px',
+      color: '#ffaa00',
+      fontFamily: 'monospace',
+      backgroundColor: '#332200',
+      padding: { x: 22, y: 8 },
+    }).setOrigin(0.5).setInteractive();
+
+    this.gachaAdBtn.on('pointerdown', () => {
+      if (this.gachaAdUsed) return;
+      this.playerData.addGems(this.gachaManager.getCost());
+      this.refreshCurrencyDisplay();
+      this.refreshGachaDisplay();
+      this.doGachaPull();
+      this.gachaAdUsed = true;
+      this.gachaAdBtn.setText('✓ 使用済み');
+      this.gachaAdBtn.disableInteractive();
+    });
+
+    container.add([title, this.gachaGemText, this.gachaPityText, rateText, noteText, pullBtn, this.gachaAdBtn]);
+  }
+
+  private doGachaPull(): void {
+    const result = this.gachaManager.pull(this.playerData);
+    if (!result) {
+      this.showGachaMessage('💎が足りません!', '#ff4444');
+      return;
+    }
+    this.clearGachaResult();
+    this.showGachaResult(result);
+    this.refreshGachaDisplay();
+    this.refreshCurrencyDisplay();
+  }
+
+  private showGachaResult(result: GachaResult): void {
+    const { line, rarity, newCount } = result;
+    const color = PART_RARITY_COLORS[rarity];
+    const bgColor = PART_RARITY_BG[rarity];
+    const label = PART_RARITY_LABELS[rarity];
+    const slotIcon = PART_SLOT_ICONS[line.slot];
+    const slotLabel = PART_SLOT_LABELS[line.slot];
+    const partName = line.names[rarity];
+
+    const centerY = HEADER_HEIGHT + 280;
+
+    if (rarity === 'sr') this.cameras.main.flash(400, 200, 100, 255);
+    else if (rarity === 'r') this.cameras.main.flash(200, 80, 120, 255);
+
+    const card = this.add.rectangle(GAME_WIDTH / 2, centerY, GAME_WIDTH - 60, 260, bgColor)
+      .setStrokeStyle(3, Phaser.Display.Color.HexStringToColor(color).color);
+    this.tabContainers.gacha.add(card);
+    this.gachaResultContainer.push(card);
+
+    const rarityText = this.add.text(GAME_WIDTH / 2, centerY - 95, label, {
+      fontSize: '20px', color, fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    this.tabContainers.gacha.add(rarityText);
+    this.gachaResultContainer.push(rarityText);
+
+    const slotText = this.add.text(GAME_WIDTH / 2, centerY - 70, `${slotIcon} ${slotLabel}`, {
+      fontSize: '12px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    this.tabContainers.gacha.add(slotText);
+    this.gachaResultContainer.push(slotText);
+
+    const icon = this.add.text(GAME_WIDTH / 2, centerY - 35, slotIcon, {
+      fontSize: '40px', color: '#' + line.color.toString(16).padStart(6, '0'),
+    }).setOrigin(0.5);
+    this.tabContainers.gacha.add(icon);
+    this.gachaResultContainer.push(icon);
+
+    const nameText = this.add.text(GAME_WIDTH / 2, centerY + 5, partName, {
+      fontSize: '17px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    this.tabContainers.gacha.add(nameText);
+    this.gachaResultContainer.push(nameText);
+
+    const nextRarity = NEXT_RARITY[rarity];
+    let countStr = `所持: ${newCount}個`;
+    if (nextRarity) countStr += ` (進化まで ${newCount}/${EVOLUTION_COST})`;
+    const canEvolve = newCount >= EVOLUTION_COST && nextRarity;
+    const countText = this.add.text(GAME_WIDTH / 2, centerY + 30, countStr, {
+      fontSize: '12px',
+      color: canEvolve ? '#00ff88' : '#aaaaaa',
+      fontFamily: 'monospace',
+      fontStyle: canEvolve ? 'bold' : 'normal',
+    }).setOrigin(0.5);
+    this.tabContainers.gacha.add(countText);
+    this.gachaResultContainer.push(countText);
+
+    if (canEvolve) {
+      const evolveHint = this.add.text(GAME_WIDTH / 2, centerY + 48, '✨ 進化可能! パーツタブで進化', {
+        fontSize: '11px', color: '#00ff88', fontFamily: 'monospace',
+      }).setOrigin(0.5);
+      this.tabContainers.gacha.add(evolveHint);
+      this.gachaResultContainer.push(evolveHint);
+      this.tweens.add({ targets: evolveHint, alpha: 0.4, duration: 500, yoyo: true, repeat: -1 });
+    }
+
+    const bonus = RARITY_BONUS[rarity];
+    const hp = line.hp + bonus.hp;
+    const atk = line.atk + bonus.atk;
+    const spd = line.speed + bonus.speed;
+    let statsStr = `HP:${hp} ATK:${atk} SPD:${spd}`;
+    if (line.fireRate > 0) statsStr += ` FR:${line.fireRate - RARITY_FIRERATE_BONUS[rarity]}ms`;
+    const statsText = this.add.text(GAME_WIDTH / 2, centerY + 68, statsStr, {
+      fontSize: '11px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    this.tabContainers.gacha.add(statsText);
+    this.gachaResultContainer.push(statsText);
+
+    let nextY = centerY + 85;
+    if (line.abilityDesc) {
+      const abilityText = this.add.text(GAME_WIDTH / 2, nextY, line.abilityDesc, {
+        fontSize: '11px', color, fontFamily: 'monospace',
+      }).setOrigin(0.5);
+      this.tabContainers.gacha.add(abilityText);
+      this.gachaResultContainer.push(abilityText);
+      nextY += 14;
+    }
+
+    if (line.bonusAbilities) {
+      const ri = PART_RARITY_ORDER.indexOf(rarity);
+      const tiers: { key: 'sr' | 'ur' | 'lr'; label: string; minRi: number }[] = [
+        { key: 'sr', label: 'SR', minRi: 2 },
+        { key: 'ur', label: 'UR', minRi: 3 },
+        { key: 'lr', label: 'LR', minRi: 4 },
+      ];
+      for (const tier of tiers) {
+        const ba = line.bonusAbilities[tier.key];
+        if (!ba) continue;
+        const unlocked = ri >= tier.minRi;
+        const tierColor = unlocked ? PART_RARITY_COLORS[tier.key] : '#444444';
+        const prefix = unlocked ? '✦' : '🔒';
+        const baText = this.add.text(GAME_WIDTH / 2, nextY, `${prefix} ${tier.label}: ${ba.desc}`, {
+          fontSize: '9px', color: tierColor, fontFamily: 'monospace',
+        }).setOrigin(0.5);
+        this.tabContainers.gacha.add(baText);
+        this.gachaResultContainer.push(baText);
+        nextY += 12;
+      }
+    }
+
+    card.setScale(0);
+    this.tweens.add({ targets: card, scaleX: 1, scaleY: 1, duration: 300, ease: 'Back.easeOut' });
+  }
+
+  private clearGachaResult(): void {
+    for (const obj of this.gachaResultContainer) obj.destroy();
+    this.gachaResultContainer = [];
+  }
+
+  private refreshGachaDisplay(): void {
+    if (this.gachaGemText) this.gachaGemText.setText(`💎 ${this.playerData.data.gems}`);
+    if (this.gachaPityText) this.gachaPityText.setText(this.getPityText());
+  }
+
+  private getPityText(): string {
+    const pity = this.gachaManager.getPityCount(this.playerData);
+    const threshold = this.gachaManager.getPityThreshold();
+    return `天井まで: ${threshold - pity}回`;
+  }
+
+  private showGachaMessage(msg: string, color: string): void {
+    const text = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 280, msg, {
+      fontSize: '20px', color, fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    this.tabContainers.gacha.add(text);
+    this.tweens.add({
+      targets: text, alpha: 0, y: text.y - 50, duration: 1500,
+      onComplete: () => text.destroy(),
+    });
+  }
+
   // ---------- Bottom nav ----------
 
   private createBottomNav(): void {
@@ -688,17 +916,13 @@ export class LobbyScene extends Phaser.Scene {
   private setTab(key: TabKey): void {
     this.closePopup();
 
-    if (key === 'gacha') {
-      this.scene.start('GachaScene', { playerData: this.playerData });
-      return;
-    }
-
     this.currentTab = key;
-    (['shop', 'upgrade', 'top', 'parts'] as const).forEach(k => {
+    TAB_ORDER.forEach(k => {
       this.tabContainers[k].setVisible(k === key);
     });
 
     if (key === 'parts') this.updatePartsDisplay();
+    if (key === 'gacha') this.refreshGachaDisplay();
 
     this.refreshCurrencyDisplay();
     this.refreshNavHighlight();
