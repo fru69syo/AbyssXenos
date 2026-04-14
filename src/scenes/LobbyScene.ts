@@ -1,15 +1,35 @@
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { PlayerData } from '../managers/PlayerData';
 import {
-  PartSlot, PartRarity, PART_SLOTS, PART_SLOT_LABELS, PART_SLOT_ICONS,
-  getPartLineById, calcPartStats, parsePartKey, partKey,
-  PART_RARITY_COLORS, PART_RARITY_LABELS, PART_RARITY_BG,
+  PartSlot, PART_SLOTS, PART_SLOT_LABELS, PART_SLOT_ICONS,
+  getPartLineById, calcPartStats, parsePartKey,
+  PART_RARITY_COLORS, PART_RARITY_LABELS,
   RARITY_BONUS, RARITY_FIRERATE_BONUS,
   EVOLUTION_COST, NEXT_RARITY, PART_RARITY_ORDER,
 } from '../data/parts';
 import { UPGRADES } from '../data/upgrades';
 import { STAGES } from '../data/stages';
 import { AudioManager } from '../audio/AudioManager';
+
+type TabKey = 'shop' | 'upgrade' | 'top' | 'parts' | 'gacha';
+const TAB_ORDER: TabKey[] = ['shop', 'upgrade', 'top', 'parts', 'gacha'];
+const TAB_LABELS: Record<TabKey, string> = {
+  shop: 'ショップ',
+  upgrade: 'アップグレード',
+  top: 'トップ',
+  parts: 'パーツ',
+  gacha: 'ガチャ',
+};
+const TAB_ICONS: Record<TabKey, string> = {
+  shop: '🛒',
+  upgrade: '⬆',
+  top: '🏠',
+  parts: '🔧',
+  gacha: '🎰',
+};
+
+const NAV_HEIGHT = 60;
+const HEADER_HEIGHT = 50;
 
 export class LobbyScene extends Phaser.Scene {
   private playerData!: PlayerData;
@@ -19,6 +39,19 @@ export class LobbyScene extends Phaser.Scene {
   private statsText!: Phaser.GameObjects.Text;
   private popupContainer: Phaser.GameObjects.GameObject[] = [];
 
+  private tabContainers!: Record<'shop' | 'upgrade' | 'top' | 'parts', Phaser.GameObjects.Container>;
+  private currentTab: TabKey = 'top';
+  private navButtons: { rect: Phaser.GameObjects.Rectangle; iconText: Phaser.GameObjects.Text; labelText: Phaser.GameObjects.Text; key: TabKey }[] = [];
+
+  // Carousel state
+  private stageCards: Phaser.GameObjects.Container[] = [];
+  private selectedStageIndex: number = 0;
+  private carouselRoot!: Phaser.GameObjects.Container;
+  private stageIndicatorText!: Phaser.GameObjects.Text;
+  private launchBtn!: Phaser.GameObjects.Text;
+  private swipeStartX: number = 0;
+  private swipeActive: boolean = false;
+
   constructor() {
     super('LobbyScene');
   }
@@ -26,15 +59,22 @@ export class LobbyScene extends Phaser.Scene {
   create(): void {
     this.playerData = new PlayerData();
     AudioManager.get().playBGM('lobby');
-    // シーン再起動時、slotTexts / popupContainer には前回の破棄済み Text が
-    // 残っておりそのまま setText すると Frame.data が null で落ちるので都度リセット
+
     this.slotTexts = [];
     this.popupContainer = [];
+    this.stageCards = [];
+    this.navButtons = [];
+
+    const highest = this.playerData.data.highestStage;
+    this.selectedStageIndex = Phaser.Math.Clamp(highest, 0, STAGES.length - 1);
+
     this.createBackground();
-    this.createCurrencyDisplay();
-    this.createPartsDisplay();
-    this.createUpgradePanel();
-    this.createButtons();
+    this.createHeader();
+    this.createTabContainers();
+    this.createBottomNav();
+    this.setupSwipeInput();
+
+    this.setTab('top');
   }
 
   private createBackground(): void {
@@ -48,49 +88,191 @@ export class LobbyScene extends Phaser.Scene {
     }
   }
 
-  private createCurrencyDisplay(): void {
-    this.coinText = this.add.text(15, 15, `🪙 ${this.playerData.data.coins}`, {
-      fontSize: '18px', color: '#ffd700', fontFamily: 'monospace',
-    });
-    this.gemText = this.add.text(15, 40, `💎 ${this.playerData.data.gems}`, {
-      fontSize: '18px', color: '#44aaff', fontFamily: 'monospace',
+  // ---------- Header ----------
+
+  private createHeader(): void {
+    // Header backdrop
+    const bar = this.add.rectangle(GAME_WIDTH / 2, HEADER_HEIGHT / 2, GAME_WIDTH, HEADER_HEIGHT, 0x000010, 0.5);
+    bar.setDepth(1);
+
+    this.coinText = this.add.text(12, 8, `🪙 ${this.playerData.data.coins}`, {
+      fontSize: '14px', color: '#ffd700', fontFamily: 'monospace',
+    }).setDepth(2);
+
+    this.gemText = this.add.text(12, 28, `💎 ${this.playerData.data.gems}`, {
+      fontSize: '14px', color: '#44aaff', fontFamily: 'monospace',
+    }).setDepth(2);
+
+    this.add.text(GAME_WIDTH / 2, 8, 'LOBBY', {
+      fontSize: '18px', color: COLORS.UI_ACCENT, fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5, 0).setDepth(2);
+
+    // Title back button (top-right area, below audio toggles)
+    const backBtn = this.add.text(GAME_WIDTH - 12, 8, '← タイトル', {
+      fontSize: '11px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(1, 0).setInteractive().setDepth(2);
+    backBtn.on('pointerdown', () => {
+      this.scene.start('TitleScene');
     });
 
-    this.add.text(GAME_WIDTH / 2, 15, 'LOBBY', {
-      fontSize: '24px', color: COLORS.UI_ACCENT, fontFamily: 'monospace', fontStyle: 'bold',
-    }).setOrigin(0.5, 0);
+    // Audio toggles below back button
+    this.createAudioToggles(GAME_WIDTH - 12, 26);
   }
 
-  private createPartsDisplay(): void {
-    this.add.text(GAME_WIDTH / 2, 60, '— パーツ装備 —', {
-      fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
+  private createAudioToggles(rightX: number, y: number): void {
+    const am = AudioManager.get();
+    const seBtn = this.add.text(rightX, y, '', {
+      fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#222244', padding: { x: 4, y: 2 },
+    }).setOrigin(1, 0).setInteractive().setDepth(2);
+    const bgmBtn = this.add.text(rightX - 56, y, '', {
+      fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#222244', padding: { x: 4, y: 2 },
+    }).setOrigin(1, 0).setInteractive().setDepth(2);
+
+    const refresh = () => {
+      bgmBtn.setText(`BGM ${am.muteBGM ? 'OFF' : 'ON'}`);
+      seBtn.setText(`SE ${am.muteSE ? 'OFF' : 'ON'}`);
+      bgmBtn.setStyle({ color: am.muteBGM ? '#888888' : '#ffffff' });
+      seBtn.setStyle({ color: am.muteSE ? '#888888' : '#ffffff' });
+    };
+    refresh();
+
+    bgmBtn.on('pointerdown', () => {
+      am.setMuteBGM(!am.muteBGM);
+      if (!am.muteBGM) am.playBGM('lobby');
+      refresh();
+    });
+    seBtn.on('pointerdown', () => {
+      am.setMuteSE(!am.muteSE);
+      refresh();
+    });
+  }
+
+  private refreshCurrencyDisplay(): void {
+    this.coinText.setText(`🪙 ${this.playerData.data.coins}`);
+    this.gemText.setText(`💎 ${this.playerData.data.gems}`);
+  }
+
+  // ---------- Tab containers ----------
+
+  private createTabContainers(): void {
+    this.tabContainers = {
+      shop: this.add.container(0, 0).setVisible(false),
+      upgrade: this.add.container(0, 0).setVisible(false),
+      top: this.add.container(0, 0).setVisible(false),
+      parts: this.add.container(0, 0).setVisible(false),
+    };
+    this.createShopTab(this.tabContainers.shop);
+    this.createUpgradeTab(this.tabContainers.upgrade);
+    this.createTopTab(this.tabContainers.top);
+    this.createPartsTab(this.tabContainers.parts);
+  }
+
+  // ---------- SHOP tab ----------
+
+  private createShopTab(container: Phaser.GameObjects.Container): void {
+    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 30, '🛒 ショップ', {
+      fontSize: '22px', color: '#ffaa00', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    const startY = 85;
-    const rowHeight = 28;
+    const msg = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, '準備中', {
+      fontSize: '28px', color: '#666666', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    const sub = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '近日実装予定', {
+      fontSize: '14px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    container.add([title, msg, sub]);
+  }
+
+  // ---------- UPGRADE tab ----------
+
+  private createUpgradeTab(container: Phaser.GameObjects.Container): void {
+    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 20, '— 恒久アップグレード —', {
+      fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    container.add(title);
+
+    const startY = HEADER_HEIGHT + 55;
+    UPGRADES.forEach((upg, i) => {
+      const y = startY + i * 58;
+      const level = this.playerData.getUpgradeLevel(upg.id);
+      const cost = Math.floor(upg.baseCost * Math.pow(upg.costMultiplier, level));
+      const maxed = level >= upg.maxLevel;
+
+      const nameText = this.add.text(15, y, upg.name, {
+        fontSize: '14px', color: '#ffffff', fontFamily: 'monospace',
+      });
+
+      const descText = this.add.text(15, y + 20, `Lv.${level}/${upg.maxLevel}  ${upg.description}`, {
+        fontSize: '10px', color: '#888888', fontFamily: 'monospace', wordWrap: { width: GAME_WIDTH - 100 },
+      });
+
+      const btnText = maxed ? 'MAX' : `🪙${cost}`;
+      const btn = this.add.text(GAME_WIDTH - 20, y + 14, btnText, {
+        fontSize: '13px',
+        color: maxed ? '#666666' : '#ffd700',
+        fontFamily: 'monospace',
+        backgroundColor: maxed ? '#222222' : '#333300',
+        padding: { x: 8, y: 4 },
+      }).setOrigin(1, 0.5).setInteractive();
+
+      if (!maxed) {
+        btn.on('pointerdown', () => {
+          if (this.playerData.spendCoins(cost)) {
+            this.playerData.setUpgradeLevel(upg.id, level + 1);
+            this.scene.restart();
+          }
+        });
+      }
+
+      container.add([nameText, descText, btn]);
+    });
+  }
+
+  // ---------- PARTS tab ----------
+
+  private createPartsTab(container: Phaser.GameObjects.Container): void {
+    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 20, '— パーツ装備 —', {
+      fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    container.add(title);
+
+    const startY = HEADER_HEIGHT + 50;
+    const rowHeight = 36;
 
     PART_SLOTS.forEach((slot, i) => {
       const y = startY + i * rowHeight;
 
-      this.add.text(15, y, PART_SLOT_ICONS[slot], {
-        fontSize: '14px', color: '#888888', fontFamily: 'monospace',
+      const iconText = this.add.text(15, y, PART_SLOT_ICONS[slot], {
+        fontSize: '16px', color: '#888888', fontFamily: 'monospace',
       });
 
-      this.add.text(32, y, PART_SLOT_LABELS[slot], {
-        fontSize: '11px', color: '#666666', fontFamily: 'monospace',
+      const labelText = this.add.text(40, y + 2, PART_SLOT_LABELS[slot], {
+        fontSize: '12px', color: '#666666', fontFamily: 'monospace',
       });
 
-      const partText = this.add.text(110, y, '', {
+      const partText = this.add.text(120, y + 2, '', {
         fontSize: '13px', color: '#ffffff', fontFamily: 'monospace',
       }).setInteractive();
 
       partText.on('pointerdown', () => this.openPartSelect(slot));
       this.slotTexts.push(partText);
+
+      container.add([iconText, labelText, partText]);
     });
 
-    this.statsText = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 8, '', {
+    this.statsText = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 14, '', {
       fontSize: '12px', color: '#aaaaaa', fontFamily: 'monospace', align: 'center',
     }).setOrigin(0.5, 0);
+    container.add(this.statsText);
+
+    const hint = this.add.text(GAME_WIDTH / 2, startY + PART_SLOTS.length * rowHeight + 44, 'パーツ名をタップして装備変更・進化', {
+      fontSize: '10px', color: '#666666', fontFamily: 'monospace',
+    }).setOrigin(0.5, 0);
+    container.add(hint);
 
     this.updatePartsDisplay();
   }
@@ -130,21 +312,19 @@ export class LobbyScene extends Phaser.Scene {
 
     const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
 
-    // Overlay
     const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
       .setInteractive().setDepth(10);
     overlay.on('pointerdown', () => this.closePopup());
     this.popupContainer.push(overlay);
 
-    // Title
-    const title = this.add.text(GAME_WIDTH / 2, 80, `${PART_SLOT_ICONS[slot]} ${PART_SLOT_LABELS[slot]}を選択`, {
-      fontSize: '20px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+    const title = this.add.text(GAME_WIDTH / 2, 70, `${PART_SLOT_ICONS[slot]} ${PART_SLOT_LABELS[slot]}を選択`, {
+      fontSize: '18px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(11);
     this.popupContainer.push(title);
 
     const cardHeight = 95;
     const gap = 6;
-    const startY = 115;
+    const startY = 100;
 
     ownedParts.forEach((item, i) => {
       const y = startY + i * (cardHeight + gap);
@@ -160,7 +340,6 @@ export class LobbyScene extends Phaser.Scene {
         .setInteractive().setDepth(11);
       this.popupContainer.push(card);
 
-      // Rarity + name
       const rLabel = PART_RARITY_LABELS[item.rarity];
       const partName = line.names[item.rarity];
       const nameText = this.add.text(22, y + 4, `[${rLabel}] ${partName}`, {
@@ -168,7 +347,6 @@ export class LobbyScene extends Phaser.Scene {
       }).setDepth(12);
       this.popupContainer.push(nameText);
 
-      // Count + evolution
       const nextRarity = NEXT_RARITY[item.rarity];
       const canEvolve = this.playerData.canEvolve(item.lineId, item.rarity);
       let countStr = `×${item.count}`;
@@ -180,7 +358,6 @@ export class LobbyScene extends Phaser.Scene {
       }).setDepth(12);
       this.popupContainer.push(countText);
 
-      // Stats
       const bonus = RARITY_BONUS[item.rarity];
       const hp = line.hp + bonus.hp;
       const atk = line.atk + bonus.atk;
@@ -194,7 +371,6 @@ export class LobbyScene extends Phaser.Scene {
       }).setDepth(12);
       this.popupContainer.push(statsText);
 
-      // Ability
       let abilY = y + 46;
       if (line.abilityDesc) {
         const abilText = this.add.text(22, abilY, line.abilityDesc, {
@@ -204,7 +380,6 @@ export class LobbyScene extends Phaser.Scene {
         abilY += 12;
       }
 
-      // Bonus abilities (SR/UR/LR)
       if (line.bonusAbilities) {
         const ri = PART_RARITY_ORDER.indexOf(item.rarity);
         const tiers: { key: 'sr' | 'ur' | 'lr'; label: string; minRi: number }[] = [
@@ -226,7 +401,6 @@ export class LobbyScene extends Phaser.Scene {
         }
       }
 
-      // Right side: equip marker or evolve button
       if (isEquipped) {
         const eqMark = this.add.text(GAME_WIDTH - 22, y + 8, '装備中', {
           fontSize: '11px', color: '#00ff88', fontFamily: 'monospace',
@@ -234,7 +408,6 @@ export class LobbyScene extends Phaser.Scene {
         this.popupContainer.push(eqMark);
       }
 
-      // Evolve button
       if (canEvolve && nextRarity) {
         const evolveBtn = this.add.text(GAME_WIDTH - 22, y + 30, `進化→${PART_RARITY_LABELS[nextRarity]}`, {
           fontSize: '11px', color: '#000000', fontFamily: 'monospace', fontStyle: 'bold',
@@ -247,13 +420,11 @@ export class LobbyScene extends Phaser.Scene {
           this.playerData.evolvePart(item.lineId, item.rarity);
           this.closePopup();
           this.updatePartsDisplay();
-          // 進化演出
           this.cameras.main.flash(400, 0, 255, 136);
-          this.openPartSelect(slot); // リロード
+          this.openPartSelect(slot);
         });
       }
 
-      // Tap card to equip
       card.on('pointerdown', () => {
         this.playerData.equipPart(slot, item.key);
         this.closePopup();
@@ -267,199 +438,269 @@ export class LobbyScene extends Phaser.Scene {
     this.popupContainer = [];
   }
 
-  private openStageSelect(): void {
-    this.closePopup();
+  // ---------- TOP tab: stage carousel ----------
 
-    const highest = this.playerData.data.highestStage; // 0 = まだ未クリア
+  private createTopTab(container: Phaser.GameObjects.Container): void {
+    const highest = this.playerData.data.highestStage;
 
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
-      .setInteractive().setDepth(20);
-    overlay.on('pointerdown', () => this.closePopup());
-    this.popupContainer.push(overlay);
-
-    const title = this.add.text(GAME_WIDTH / 2, 60, 'ステージ選択', {
-      fontSize: '22px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(21);
-    this.popupContainer.push(title);
-
-    const subtitle = this.add.text(GAME_WIDTH / 2, 88, `最高到達: ステージ ${highest}`, {
-      fontSize: '12px', color: '#aaaacc', fontFamily: 'monospace',
-    }).setOrigin(0.5).setDepth(21);
-    this.popupContainer.push(subtitle);
-
-    const startY = 120;
-    const cardH = 60;
-    const gap = 8;
-
-    STAGES.forEach((stage, i) => {
-      const y = startY + i * (cardH + gap);
-      const stageNum = i + 1;
-      // 初回は Stage1 のみ解放、以後はクリア数+1 まで選択可能
-      const unlocked = stageNum <= highest + 1;
-
-      const bgColor = unlocked ? 0x112244 : 0x111111;
-      const borderColor = unlocked ? 0x4488ff : 0x333333;
-
-      const card = this.add.rectangle(GAME_WIDTH / 2, y + cardH / 2, GAME_WIDTH - 40, cardH, bgColor)
-        .setStrokeStyle(2, borderColor).setDepth(21);
-      this.popupContainer.push(card);
-
-      const nameColor = unlocked ? '#ffffff' : '#555555';
-      const nameText = this.add.text(30, y + 8, `STAGE ${stageNum}`, {
-        fontSize: '14px', color: unlocked ? '#ffd700' : '#555555', fontFamily: 'monospace', fontStyle: 'bold',
-      }).setDepth(22);
-      this.popupContainer.push(nameText);
-
-      const stageLabel = this.add.text(30, y + 26, stage.name, {
-        fontSize: '16px', color: nameColor, fontFamily: 'monospace',
-      }).setDepth(22);
-      this.popupContainer.push(stageLabel);
-
-      const info = this.add.text(30, y + 44, `Wave ${stage.waves.length} + Boss  /  BossHP ${stage.boss.hp}`, {
-        fontSize: '10px', color: unlocked ? '#aaaacc' : '#444444', fontFamily: 'monospace',
-      }).setDepth(22);
-      this.popupContainer.push(info);
-
-      if (unlocked) {
-        const playBtn = this.add.text(GAME_WIDTH - 30, y + cardH / 2, '▶ 出撃', {
-          fontSize: '14px', color: '#000000', fontFamily: 'monospace', fontStyle: 'bold',
-          backgroundColor: '#44ccff', padding: { x: 10, y: 6 },
-        }).setOrigin(1, 0.5).setDepth(23).setInteractive();
-        this.popupContainer.push(playBtn);
-
-        const startStage = (pointer: Phaser.Input.Pointer) => {
-          pointer.event.stopPropagation();
-          this.closePopup();
-          this.scene.start('GameScene', { playerData: this.playerData, startStageIndex: i });
-        };
-        playBtn.on('pointerdown', startStage);
-        card.setInteractive();
-        card.on('pointerdown', startStage);
-      } else {
-        const lockText = this.add.text(GAME_WIDTH - 30, y + cardH / 2, '🔒 LOCKED', {
-          fontSize: '12px', color: '#666666', fontFamily: 'monospace',
-        }).setOrigin(1, 0.5).setDepth(23);
-        this.popupContainer.push(lockText);
-      }
-    });
-
-    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, '✕ 閉じる', {
-      fontSize: '14px', color: '#888888', fontFamily: 'monospace',
-    }).setOrigin(0.5).setDepth(23).setInteractive();
-    closeBtn.on('pointerdown', () => this.closePopup());
-    this.popupContainer.push(closeBtn);
-  }
-
-  private createUpgradePanel(): void {
-    this.add.text(GAME_WIDTH / 2, 275, '— 恒久アップグレード —', {
+    const title = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 15, '— ステージ選択 —', {
       fontSize: '16px', color: '#aaaacc', fontFamily: 'monospace',
     }).setOrigin(0.5);
+    container.add(title);
 
-    UPGRADES.forEach((upg, i) => {
-      const y = 310 + i * 50;
-      const level = this.playerData.getUpgradeLevel(upg.id);
-      const cost = Math.floor(upg.baseCost * Math.pow(upg.costMultiplier, level));
-      const maxed = level >= upg.maxLevel;
+    const subtitle = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 38, `最高到達: ステージ ${highest}`, {
+      fontSize: '11px', color: '#888888', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    container.add(subtitle);
 
-      this.add.text(15, y, upg.name, {
-        fontSize: '14px', color: '#ffffff', fontFamily: 'monospace',
-      });
+    // Carousel root container; child cards are absolutely positioned
+    this.carouselRoot = this.add.container(0, 0);
+    container.add(this.carouselRoot);
 
-      this.add.text(15, y + 18, `Lv.${level}/${upg.maxLevel}  ${upg.description}`, {
-        fontSize: '11px', color: '#888888', fontFamily: 'monospace',
-      });
-
-      const btnText = maxed ? 'MAX' : `🪙${cost}`;
-      const btn = this.add.text(GAME_WIDTH - 20, y + 8, btnText, {
-        fontSize: '14px',
-        color: maxed ? '#666666' : '#ffd700',
-        fontFamily: 'monospace',
-        backgroundColor: maxed ? '#222222' : '#333300',
-        padding: { x: 8, y: 4 },
-      }).setOrigin(1, 0.5).setInteractive();
-
-      if (!maxed) {
-        btn.on('pointerdown', () => {
-          if (this.playerData.spendCoins(cost)) {
-            this.playerData.setUpgradeLevel(upg.id, level + 1);
-            this.scene.restart();
-          }
-        });
-      }
+    const cardCenterY = HEADER_HEIGHT + 220;
+    STAGES.forEach((_stage, i) => {
+      const card = this.createStageCard(i, cardCenterY);
+      this.carouselRoot.add(card);
+      this.stageCards.push(card);
     });
-  }
+    this.layoutCarousel(false);
 
-  private createButtons(): void {
-    const startBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 130, '⚔  出撃  ⚔', {
-      fontSize: '28px',
+    // Arrows + indicator
+    const arrowY = HEADER_HEIGHT + 395;
+    const leftArrow = this.add.text(30, arrowY, '◀', {
+      fontSize: '28px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#223344', padding: { x: 10, y: 4 },
+    }).setOrigin(0.5).setInteractive();
+    leftArrow.on('pointerdown', () => this.changeStage(-1));
+
+    const rightArrow = this.add.text(GAME_WIDTH - 30, arrowY, '▶', {
+      fontSize: '28px', color: '#ffffff', fontFamily: 'monospace',
+      backgroundColor: '#223344', padding: { x: 10, y: 4 },
+    }).setOrigin(0.5).setInteractive();
+    rightArrow.on('pointerdown', () => this.changeStage(1));
+
+    this.stageIndicatorText = this.add.text(GAME_WIDTH / 2, arrowY, '', {
+      fontSize: '16px', color: '#ffffff', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    container.add([leftArrow, rightArrow, this.stageIndicatorText]);
+
+    // Launch button
+    this.launchBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - NAV_HEIGHT - 50, '⚔  出撃  ⚔', {
+      fontSize: '24px',
       color: '#ffffff',
       fontFamily: 'monospace',
       backgroundColor: '#004466',
-      padding: { x: 50, y: 15 },
+      padding: { x: 40, y: 12 },
     }).setOrigin(0.5).setInteractive();
 
-    startBtn.on('pointerover', () => startBtn.setStyle({ backgroundColor: '#006699' }));
-    startBtn.on('pointerout', () => startBtn.setStyle({ backgroundColor: '#004466' }));
-    startBtn.on('pointerdown', () => {
-      this.openStageSelect();
+    this.launchBtn.on('pointerover', () => {
+      if (this.isStageUnlocked(this.selectedStageIndex)) {
+        this.launchBtn.setStyle({ backgroundColor: '#006699' });
+      }
     });
+    this.launchBtn.on('pointerout', () => {
+      if (this.isStageUnlocked(this.selectedStageIndex)) {
+        this.launchBtn.setStyle({ backgroundColor: '#004466' });
+      }
+    });
+    this.launchBtn.on('pointerdown', () => this.launchSelectedStage());
 
     this.tweens.add({
-      targets: startBtn,
+      targets: this.launchBtn,
       scaleX: 1.03, scaleY: 1.03,
       duration: 600, yoyo: true, repeat: -1,
       ease: 'Sine.easeInOut',
     });
+    container.add(this.launchBtn);
 
-    const gachaBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 65, '🎰  ガチャ', {
-      fontSize: '22px',
-      color: '#ffaa00',
-      fontFamily: 'monospace',
-      backgroundColor: '#332200',
-      padding: { x: 35, y: 10 },
-    }).setOrigin(0.5).setInteractive();
-
-    gachaBtn.on('pointerdown', () => {
-      this.scene.start('GachaScene', { playerData: this.playerData });
-    });
-
-    this.add.text(15, GAME_HEIGHT - 30, '← タイトル', {
-      fontSize: '14px', color: '#666666', fontFamily: 'monospace',
-    }).setInteractive().on('pointerdown', () => {
-      this.scene.start('TitleScene');
-    });
-
-    // 音量 ON/OFF トグル (右下)
-    this.createAudioToggles(GAME_WIDTH - 15, GAME_HEIGHT - 30);
+    this.updateLaunchButton();
+    this.updateStageIndicator();
   }
 
-  private createAudioToggles(rightX: number, y: number): void {
-    const am = AudioManager.get();
-    const seBtn = this.add.text(rightX, y, '', {
-      fontSize: '12px', color: '#ffffff', fontFamily: 'monospace',
-      backgroundColor: '#222244', padding: { x: 6, y: 3 },
-    }).setOrigin(1, 0).setInteractive();
-    const bgmBtn = this.add.text(rightX - 80, y, '', {
-      fontSize: '12px', color: '#ffffff', fontFamily: 'monospace',
-      backgroundColor: '#222244', padding: { x: 6, y: 3 },
-    }).setOrigin(1, 0).setInteractive();
+  private createStageCard(index: number, centerY: number): Phaser.GameObjects.Container {
+    const stage = STAGES[index];
+    const stageNum = index + 1;
+    const highest = this.playerData.data.highestStage;
+    const unlocked = stageNum <= highest + 1;
 
-    const refresh = () => {
-      bgmBtn.setText(`BGM ${am.muteBGM ? 'OFF' : 'ON'}`);
-      seBtn.setText(`SE ${am.muteSE ? 'OFF' : 'ON'}`);
-      bgmBtn.setStyle({ color: am.muteBGM ? '#888888' : '#ffffff' });
-      seBtn.setStyle({ color: am.muteSE ? '#888888' : '#ffffff' });
-    };
-    refresh();
+    const card = this.add.container(GAME_WIDTH / 2, centerY);
 
-    bgmBtn.on('pointerdown', () => {
-      am.setMuteBGM(!am.muteBGM);
-      if (!am.muteBGM) am.playBGM('lobby');
-      refresh();
+    const bgColor = unlocked ? 0x112244 : 0x111111;
+    const borderColor = unlocked ? 0x4488ff : 0x333333;
+    const bg = this.add.rectangle(0, 0, GAME_WIDTH - 40, 300, bgColor)
+      .setStrokeStyle(2, borderColor);
+
+    const nameColor = unlocked ? '#ffffff' : '#555555';
+    const stageLabel = this.add.text(0, -110, `STAGE ${stageNum}`, {
+      fontSize: '22px', color: unlocked ? '#ffd700' : '#555555', fontFamily: 'monospace', fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    const nameText = this.add.text(0, -70, stage.name, {
+      fontSize: '18px', color: nameColor, fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    const waveText = this.add.text(0, -20, `Wave ${stage.waves.length} + Boss`, {
+      fontSize: '14px', color: unlocked ? '#aaaacc' : '#444444', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    const bossText = this.add.text(0, 10, `Boss HP ${stage.boss.hp}`, {
+      fontSize: '14px', color: unlocked ? '#ff6688' : '#444444', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    const hpMul = index + 1;
+    const mulText = this.add.text(0, 40, `敵HP ×${hpMul}`, {
+      fontSize: '12px', color: unlocked ? '#88aadd' : '#333333', fontFamily: 'monospace',
+    }).setOrigin(0.5);
+
+    card.add([bg, stageLabel, nameText, waveText, bossText, mulText]);
+
+    if (!unlocked) {
+      const lock = this.add.text(0, 90, '🔒 LOCKED', {
+        fontSize: '18px', color: '#666666', fontFamily: 'monospace',
+      }).setOrigin(0.5);
+      card.add(lock);
+      card.setAlpha(0.5);
+    } else if (stageNum <= highest) {
+      const cleared = this.add.text(0, 90, '✓ クリア済み', {
+        fontSize: '14px', color: '#00ff88', fontFamily: 'monospace',
+      }).setOrigin(0.5);
+      card.add(cleared);
+    }
+
+    return card;
+  }
+
+  private layoutCarousel(animate: boolean): void {
+    for (let i = 0; i < this.stageCards.length; i++) {
+      const targetX = GAME_WIDTH / 2 + (i - this.selectedStageIndex) * GAME_WIDTH;
+      if (animate) {
+        this.tweens.add({
+          targets: this.stageCards[i],
+          x: targetX,
+          duration: 220,
+          ease: 'Cubic.easeOut',
+        });
+      } else {
+        this.stageCards[i].x = targetX;
+      }
+    }
+  }
+
+  private changeStage(delta: number): void {
+    const newIndex = Phaser.Math.Clamp(this.selectedStageIndex + delta, 0, STAGES.length - 1);
+    if (newIndex === this.selectedStageIndex) return;
+    this.selectedStageIndex = newIndex;
+    this.layoutCarousel(true);
+    this.updateLaunchButton();
+    this.updateStageIndicator();
+  }
+
+  private updateStageIndicator(): void {
+    this.stageIndicatorText.setText(`STAGE ${this.selectedStageIndex + 1} / ${STAGES.length}`);
+  }
+
+  private isStageUnlocked(index: number): boolean {
+    const stageNum = index + 1;
+    return stageNum <= this.playerData.data.highestStage + 1;
+  }
+
+  private updateLaunchButton(): void {
+    if (this.isStageUnlocked(this.selectedStageIndex)) {
+      this.launchBtn.setStyle({ color: '#ffffff', backgroundColor: '#004466' });
+      this.launchBtn.setText('⚔  出撃  ⚔');
+      this.launchBtn.setInteractive();
+    } else {
+      this.launchBtn.setStyle({ color: '#666666', backgroundColor: '#222222' });
+      this.launchBtn.setText('🔒 LOCKED');
+      this.launchBtn.disableInteractive();
+    }
+  }
+
+  private launchSelectedStage(): void {
+    if (!this.isStageUnlocked(this.selectedStageIndex)) return;
+    this.scene.start('GameScene', { playerData: this.playerData, startStageIndex: this.selectedStageIndex });
+  }
+
+  private setupSwipeInput(): void {
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.currentTab !== 'top') return;
+      if (this.popupContainer.length > 0) return;
+      // Avoid triggering when clicking within nav area or header
+      if (pointer.y < HEADER_HEIGHT + 60) return;
+      if (pointer.y > GAME_HEIGHT - NAV_HEIGHT - 70) return;
+      this.swipeActive = true;
+      this.swipeStartX = pointer.x;
     });
-    seBtn.on('pointerdown', () => {
-      am.setMuteSE(!am.muteSE);
-      refresh();
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (!this.swipeActive) return;
+      this.swipeActive = false;
+      if (this.currentTab !== 'top') return;
+      if (this.popupContainer.length > 0) return;
+      const dx = pointer.x - this.swipeStartX;
+      if (dx > 50) this.changeStage(-1);
+      else if (dx < -50) this.changeStage(1);
     });
+  }
+
+  // ---------- Bottom nav ----------
+
+  private createBottomNav(): void {
+    const navY = GAME_HEIGHT - NAV_HEIGHT;
+    const bg = this.add.rectangle(GAME_WIDTH / 2, navY + NAV_HEIGHT / 2, GAME_WIDTH, NAV_HEIGHT, 0x000010, 0.9);
+    bg.setStrokeStyle(1, 0x2244aa);
+    bg.setDepth(5);
+
+    const tabWidth = GAME_WIDTH / TAB_ORDER.length;
+
+    TAB_ORDER.forEach((key, i) => {
+      const cx = tabWidth * (i + 0.5);
+      const cy = navY + NAV_HEIGHT / 2;
+
+      const rect = this.add.rectangle(cx, cy, tabWidth - 2, NAV_HEIGHT - 4, 0x222244)
+        .setInteractive()
+        .setDepth(6);
+
+      const iconText = this.add.text(cx, cy - 12, TAB_ICONS[key], {
+        fontSize: '18px', fontFamily: 'monospace',
+      }).setOrigin(0.5).setDepth(7);
+
+      const labelText = this.add.text(cx, cy + 12, TAB_LABELS[key], {
+        fontSize: '9px', color: '#ffffff', fontFamily: 'monospace',
+      }).setOrigin(0.5).setDepth(7);
+
+      rect.on('pointerdown', () => this.setTab(key));
+
+      this.navButtons.push({ rect, iconText, labelText, key });
+    });
+  }
+
+  private refreshNavHighlight(): void {
+    for (const btn of this.navButtons) {
+      const selected = btn.key === this.currentTab;
+      btn.rect.setFillStyle(selected ? 0x004466 : 0x222244);
+      btn.labelText.setColor(selected ? '#44ccff' : '#aaaaaa');
+    }
+  }
+
+  // ---------- Tab switch ----------
+
+  private setTab(key: TabKey): void {
+    this.closePopup();
+
+    if (key === 'gacha') {
+      this.scene.start('GachaScene', { playerData: this.playerData });
+      return;
+    }
+
+    this.currentTab = key;
+    (['shop', 'upgrade', 'top', 'parts'] as const).forEach(k => {
+      this.tabContainers[k].setVisible(k === key);
+    });
+
+    if (key === 'parts') this.updatePartsDisplay();
+
+    this.refreshCurrencyDisplay();
+    this.refreshNavHighlight();
   }
 }
