@@ -1,7 +1,7 @@
 export interface SpawnGroup {
   enemyId: number;
   count: number;
-  formation: 'line' | 'v' | 'random' | 'side' | 'burst';
+  formation: 'line' | 'v' | 'random' | 'side' | 'burst' | 'side_enter';
   speedBase: number;
   startDelay: number;        // wave 開始からの遅延 (ms)
   spawnInterval?: number;    // 既定 500ms。burst では 100〜150ms 等に短縮
@@ -60,6 +60,7 @@ export const STAGES: StageData[] = [
         groups: [
           G(2, 18, 'random', 110, 0, 338),
           G(4, 15, 'burst', 120, 6000, 113),
+          G(8, 5, 'random', 130, 8000, 450),       // seeker: 自機直進
         ],
         duration: 13000,
       },
@@ -67,6 +68,7 @@ export const STAGES: StageData[] = [
         groups: [
           G(1, 15, 'line', 110, 0, 338),
           G(2, 15, 'side', 120, 4000, 300),
+          G(10, 4, 'side_enter', 120, 7000, 600),  // side_rusher: 横出現→直進
         ],
         midBoss: { hp: 26, speed: 50, attackPatterns: ['aimed'] },
         duration: 15000,
@@ -76,6 +78,7 @@ export const STAGES: StageData[] = [
           G(2, 21, 'v', 120, 0, 338),
           G(4, 18, 'burst', 130, 7000, 105),
           G(1, 9, 'random', 130, 13000, 300),
+          G(14, 3, 'random', 150, 10000, 900),     // self_destruct: 突進自爆
         ],
         duration: 18000,
       },
@@ -92,6 +95,7 @@ export const STAGES: StageData[] = [
         groups: [
           G(2, 21, 'random', 110, 0, 338),
           G(3, 6, 'side', 120, 4000, 525),
+          G(9, 4, 'random', 130, 8000, 700),       // orbiter: 円運動+単発
         ],
         duration: 14000,
       },
@@ -99,6 +103,7 @@ export const STAGES: StageData[] = [
         groups: [
           G(3, 15, 'line', 130, 0, 525),
           G(4, 21, 'burst', 140, 5000, 98),
+          G(11, 4, 'side_enter', 130, 9000, 700),  // side_hunter: 横出現→狙い撃ち
         ],
         duration: 16000,
       },
@@ -106,6 +111,7 @@ export const STAGES: StageData[] = [
         groups: [
           G(4, 24, 'random', 130, 0, 285),
           G(2, 15, 'side', 140, 6000, 300),
+          G(13, 3, 'line', 90, 10000, 1200),       // bomber: 時限爆発弾
         ],
         midBoss: { hp: 40, speed: 55, attackPatterns: ['spread', 'aimed'] },
         duration: 17000,
@@ -115,6 +121,7 @@ export const STAGES: StageData[] = [
           G(6, 9, 'random', 140, 0, 600),
           G(4, 27, 'burst', 150, 6000, 98),
           G(3, 9, 'v', 150, 13000, 375),
+          G(12, 3, 'line', 90, 9000, 1100),        // homer_drone: ホーミング弾
         ],
         duration: 20000,
       },

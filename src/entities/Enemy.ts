@@ -1,4 +1,4 @@
-import { GAME_HEIGHT } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { EnemyDef, MoveTypeCode, AttackTypeCode } from '../data/enemies';
 import { SpecialDropType } from '../data/dropTypes';
 import { playAnimIfExists } from '../utils/playAnimIfExists';
@@ -26,6 +26,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private burning: boolean = false;
   private burnTimer: number = 0;
   private burnDamageTimer: number = 0;
+  // Pattern state for new movement types
+  private patternTimer: number = 0;
+  private phase: 0 | 1 = 0;
+  private aimDirX: number = 0;
+  private aimDirY: number = 1;
+  // Self-destruct state
+  private selfDestructArmed: boolean = false;
+  private selfDestructTimer: number = 0;
+  private selfDestructTween: Phaser.Tweens.Tween | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
     super(scene, x, y, texture);
@@ -65,10 +74,46 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.zigzagTimer = 0;
     this.zigzagDir = Math.random() > 0.5 ? 1 : -1;
     this.sineSeed = Math.random() * Math.PI * 2;
+    this.patternTimer = 0;
+    this.phase = 0;
+    this.aimDirX = 0;
+    this.aimDirY = 1;
+    this.selfDestructArmed = false;
+    this.selfDestructTimer = 0;
+    if (this.selfDestructTween) {
+      this.selfDestructTween.stop();
+      this.selfDestructTween = null;
+    }
+  }
+
+  /** player 位置から aim 方向 (単位ベクトル) を計算。player 不在なら真下 */
+  private computeAimDir(): void {
+    const player = this.scene.registry.get('player') as Phaser.GameObjects.Sprite | undefined;
+    if (!player || !player.active) {
+      this.aimDirX = 0;
+      this.aimDirY = 1;
+      return;
+    }
+    const a = Phaser.Math.Angle.Between(this.x, this.y, player.x, player.y);
+    this.aimDirX = Math.cos(a);
+    this.aimDirY = Math.sin(a);
   }
 
   update(_time: number, delta: number): void {
     if (!this.active) return;
+
+    // Self-destruct countdown (damage-ignoring enemies)
+    if (this.selfDestructArmed) {
+      this.selfDestructTimer -= delta;
+      if (this.selfDestructTimer <= 0) {
+        const sd = this.def.selfDestruct!;
+        this.scene.events.emit('enemy-self-destruct', {
+          x: this.x, y: this.y, radius: sd.radius, damage: sd.damage,
+        });
+        this.deactivate();
+        return;
+      }
+    }
 
     // Frozen state
     if (this.frozen) {
@@ -92,6 +137,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       }
       if (this.burnTimer <= 0) this.burning = false;
     }
+
+    this.patternTimer += delta;
 
     // Movement
     switch (this.movePattern) {
@@ -121,6 +168,43 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
           this.moveSpeed
         );
         break;
+      case 'aim_straight': {
+        // 初回のみ aim を決定
+        if (this.phase === 0) {
+          this.computeAimDir();
+          this.phase = 1;
+        }
+        this.setVelocity(this.aimDirX * this.moveSpeed, this.aimDirY * this.moveSpeed);
+        break;
+      }
+      case 'orbit_forward': {
+        const t = this.patternTimer * 0.006;
+        this.setVelocity(
+          Math.cos(t + this.sineSeed) * this.moveSpeed * 0.5,
+          this.moveSpeed * 0.8 + Math.sin(t + this.sineSeed) * this.moveSpeed * 0.25,
+        );
+        break;
+      }
+      case 'side_sway_forward': {
+        if (this.patternTimer < 2500) {
+          this.setVelocity(Math.sin(this.patternTimer * 0.002) * this.moveSpeed * 1.4, 0);
+        } else {
+          this.setVelocity(0, this.moveSpeed);
+        }
+        break;
+      }
+      case 'side_sway_aim': {
+        if (this.patternTimer < 2500) {
+          this.setVelocity(Math.sin(this.patternTimer * 0.002) * this.moveSpeed * 1.4, 0);
+        } else {
+          if (this.phase === 0) {
+            this.computeAimDir();
+            this.phase = 1;
+          }
+          this.setVelocity(this.aimDirX * this.moveSpeed, this.aimDirY * this.moveSpeed);
+        }
+        break;
+      }
     }
 
     // Apply slow field modifier
@@ -134,10 +218,33 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     if (this.y > GAME_HEIGHT + 50) {
       this.scene.events.emit('enemy-escaped', this);
       this.deactivate();
+    } else if (this.x < -80 || this.x > GAME_WIDTH + 80) {
+      // 横方向に逃げ切った場合も wave 進行のために通知
+      this.scene.events.emit('enemy-escaped', this);
+      this.deactivate();
     }
   }
 
   takeDamage(amount: number, hasFreeze: boolean, hasBurn: boolean): boolean {
+    // Self-destruct enemies: first hit arms the timer, further hits ignored
+    if (this.def.selfDestruct) {
+      if (!this.selfDestructArmed) {
+        this.selfDestructArmed = true;
+        this.selfDestructTimer = this.def.selfDestruct.delay;
+        this.setTint(0xff2222);
+        this.selfDestructTween = this.scene.tweens.add({
+          targets: this,
+          scaleX: this.def.scale * 1.2,
+          scaleY: this.def.scale * 1.2,
+          duration: 180,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      }
+      return false;
+    }
+
     this.hp -= amount;
 
     if (hasFreeze && !this.frozen) {

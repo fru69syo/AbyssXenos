@@ -126,6 +126,8 @@ export class WaveManager {
 
     for (let i = 0; i < group.count; i++) {
       let x: number;
+      let y = -30;
+      let clampX = true;
       switch (group.formation) {
         case 'line':
           x = margin + (usableWidth / (group.count + 1)) * (i + 1);
@@ -141,6 +143,12 @@ export class WaveManager {
           // 左右端から交互に侵入
           x = i % 2 === 0 ? margin + 10 : GAME_WIDTH - margin - 10;
           break;
+        case 'side_enter':
+          // 画面外 (左右) から横方向に出現、y は上半分〜中段に散らす
+          x = i % 2 === 0 ? -20 : GAME_WIDTH + 20;
+          y = 150 + (i % 5) * 50;
+          clampX = false;
+          break;
         case 'burst':
           // 密集スポーン: ランダムだがやや中央寄り
           x = GAME_WIDTH / 2 + (Math.random() - 0.5) * usableWidth * 0.7;
@@ -150,13 +158,15 @@ export class WaveManager {
           x = margin + Math.random() * usableWidth;
           break;
       }
-      // 画面端からはみ出ないようクランプ
-      x = Math.max(margin, Math.min(GAME_WIDTH - margin, x));
+      // 画面端からはみ出ないようクランプ (side_enter を除く)
+      if (clampX) {
+        x = Math.max(margin, Math.min(GAME_WIDTH - margin, x));
+      }
 
       commands.push({
         enemyId: group.enemyId,
         x,
-        y: -30,
+        y,
         speedBase: group.speedBase,
       });
     }

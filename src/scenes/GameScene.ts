@@ -120,6 +120,15 @@ export class GameScene extends Phaser.Scene {
     this.events.on('enemy-escaped', () => {
       this.waveManager.onEnemyDestroyed();
     });
+
+    // 敵弾の時限爆発 / 敵の自爆 → 自機範囲ダメージ
+    this.events.on('enemy-bullet-explode', (d: { x: number; y: number; radius: number; damage: number }) => {
+      this.applyEnemyExplosion(d.x, d.y, d.radius, d.damage);
+    });
+    this.events.on('enemy-self-destruct', (d: { x: number; y: number; radius: number; damage: number }) => {
+      this.applyEnemyExplosion(d.x, d.y, d.radius, d.damage);
+      this.waveManager.onEnemyDestroyed();
+    });
   }
 
   private createBackground(): void {
@@ -220,6 +229,8 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, GAME_WIDTH / 2, GAME_HEIGHT - 80);
     this.player.setName('player');
     this.player.init(this.runState, this.playerBullets);
+    // Expose player to enemies / enemy bullets for aiming / homing
+    this.registry.set('player', this.player);
   }
 
   private createParticles(): void {
@@ -596,6 +607,56 @@ export class GameScene extends Phaser.Scene {
         }
         break;
       }
+      case 'homing': {
+        const a = aim();
+        const bullet = this.enemyBullets.getFirstDead(false) as Bullet | null;
+        if (bullet) {
+          bullet.fire(enemy.x, enemy.y, Math.cos(a) * speed * 0.85, Math.sin(a) * speed * 0.85, 1);
+          bullet.enemyHoming = true;
+        }
+        break;
+      }
+      case 'delayed_explode': {
+        const a = aim();
+        const bullet = this.enemyBullets.getFirstDead(false) as Bullet | null;
+        if (bullet) {
+          bullet.fire(enemy.x, enemy.y, Math.cos(a) * speed * 0.7, Math.sin(a) * speed * 0.7, 1);
+          bullet.explodeIn = 1000;
+          bullet.explodeRadius = 55;
+          bullet.explodeDamage = 1;
+          bullet.setTint(0xff6622);
+        }
+        break;
+      }
+      case 'aimed_double': {
+        const a = aim();
+        for (let i = 0; i < 2; i++) {
+          this.time.delayedCall(i * 150, () => {
+            if (enemy.active) fire(Math.cos(a) * speed, Math.sin(a) * speed);
+          });
+        }
+        break;
+      }
+      case 'aimed_triple': {
+        const a = aim();
+        for (let i = 0; i < 3; i++) {
+          this.time.delayedCall(i * 80, () => {
+            if (enemy.active) fire(Math.cos(a) * speed, Math.sin(a) * speed);
+          });
+        }
+        break;
+      }
+      case 'stop_then_aim': {
+        const bullet = this.enemyBullets.getFirstDead(false) as Bullet | null;
+        if (bullet) {
+          bullet.fire(enemy.x, enemy.y, 0, speed * 0.9, 1);
+          bullet.stopAfter = 700;
+          bullet.resumeAim = true;
+          bullet.resumeSpeed = speed * 1.15;
+          bullet.setTint(0xffaa44);
+        }
+        break;
+      }
     }
   }
 
@@ -688,6 +749,28 @@ export class GameScene extends Phaser.Scene {
         if (killed) this.onEnemyKilled(nearby);
       }
     });
+  }
+
+  /** 敵弾の時限爆発や自爆敵の爆風を自機に適用 */
+  private applyEnemyExplosion(x: number, y: number, radius: number, damage: number): void {
+    AudioManager.get().playExplode();
+    this.particles.emitParticleAt(x, y, 14);
+    // 視覚的な赤いフラッシュリング
+    const ring = this.add.circle(x, y, radius, 0xff4422, 0.35);
+    this.tweens.add({
+      targets: ring,
+      alpha: 0,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 260,
+      onComplete: () => ring.destroy(),
+    });
+    if (!this.player.active) return;
+    const dist = Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y);
+    if (dist < radius) {
+      const dead = this.player.takeDamage(damage);
+      if (dead) this.onPlayerDeath();
+    }
   }
 
   private updateSkillTimers(delta: number): void {
