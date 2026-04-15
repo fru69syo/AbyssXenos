@@ -1176,7 +1176,8 @@ export class GameScene extends Phaser.Scene {
     this.particles.emitParticleAt(this.player.x, this.player.y, 20);
 
     this.playerData.addCoins(this.runState.coins);
-    this.playerData.recordRun(this.stageIndex + 1);
+    // 死亡時は highestStage を更新しない (ボス撃破 = クリアのみが進捗を前進させる)
+    this.playerData.recordDeath();
 
     this.time.delayedCall(1000, () => {
       this.hud.destroy();

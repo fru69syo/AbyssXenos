@@ -244,6 +244,12 @@ export class PlayerData {
     this.save();
   }
 
+  /** プレイヤー死亡時: totalRuns のみ加算し、highestStage は更新しない */
+  recordDeath(): void {
+    this.data.totalRuns++;
+    this.save();
+  }
+
   // ====== デバッグ用リセット ======
 
   resetStageProgress(): void {
