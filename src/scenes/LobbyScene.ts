@@ -1030,6 +1030,15 @@ export class LobbyScene extends Phaser.Scene {
           this.refreshCurrencyDisplay();
         },
       },
+      {
+        label: '🗑  ゴールド & ジェムを 0 に',
+        color: '#ffffff',
+        bg: '#442222',
+        onPress: () => {
+          this.playerData.resetCurrency();
+          this.refreshCurrencyDisplay();
+        },
+      },
     ];
 
     buttons.forEach((b, i) => {

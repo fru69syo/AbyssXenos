@@ -296,4 +296,10 @@ export class PlayerData {
     this.data.equippedParts = { ...DEFAULT_PRESET.parts };
     this.save();
   }
+
+  resetCurrency(): void {
+    this.data.coins = 0;
+    this.data.gems = 0;
+    this.save();
+  }
 }
