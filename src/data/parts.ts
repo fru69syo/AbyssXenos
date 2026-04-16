@@ -31,7 +31,7 @@ export const PART_RARITY_BG: Record<PartRarity, number> = {
 // ====== ガチャ排出 (N/R/SRのみ) ======
 
 export const PART_GACHA_WEIGHTS: Partial<Record<PartRarity, number>> = {
-  n: 55, r: 33, sr: 12,
+  n: 88, r: 11, sr: 1,
 };
 
 // ====== 進化システム ======

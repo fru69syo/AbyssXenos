@@ -780,7 +780,7 @@ export class LobbyScene extends Phaser.Scene {
       fontSize: '15px', color: '#888888', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    const rateText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 108, '排出: N 55%  R 33%  SR 12%', {
+    const rateText = this.add.text(GAME_WIDTH / 2, HEADER_HEIGHT + 108, '排出: N 88%  R 11%  SR 1%', {
       fontSize: '13px', color: '#666666', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
