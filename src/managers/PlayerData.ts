@@ -19,6 +19,8 @@ export interface PlayerSave {
   totalRuns: number;
   gachaPity: number;
   gachaTickets: number;
+  /** 初回クリアボーナスを受け取り済みのステージ番号 (1-based) */
+  firstClearedStages: number[];
 }
 
 const DEFAULT_PRESET = PRESETS[0]; // アビス・スカウト
@@ -43,6 +45,7 @@ const DEFAULT_SAVE: PlayerSave = {
   totalRuns: 0,
   gachaPity: 0,
   gachaTickets: 0,
+  firstClearedStages: [],
 };
 
 export class PlayerData {
@@ -87,6 +90,12 @@ export class PlayerData {
     if (!this.data.partInventory || Object.keys(this.data.partInventory).length === 0) {
       this.data.partInventory = buildDefaultInventory();
       this.data.equippedParts = { ...DEFAULT_PRESET.parts };
+      dirty = true;
+    }
+
+    // firstClearedStages が無い (古いセーブ) → 空配列で初期化
+    if (!Array.isArray(this.data.firstClearedStages)) {
+      this.data.firstClearedStages = [];
       dirty = true;
     }
 
@@ -250,11 +259,34 @@ export class PlayerData {
     this.save();
   }
 
+  // ====== 初回クリアボーナス ======
+
+  /** 指定ステージ (1-based) の初回クリアボーナス額: コイン 500*N、ジェム 100*N */
+  static firstClearReward(stageNumber: number): { coins: number; gems: number } {
+    return { coins: 500 * stageNumber, gems: 100 * stageNumber };
+  }
+
+  hasReceivedFirstClear(stageNumber: number): boolean {
+    return this.data.firstClearedStages.includes(stageNumber);
+  }
+
+  /** 初回クリア時に呼ぶ。未受領なら付与して報酬を返し、受領済みなら null */
+  claimFirstClearBonus(stageNumber: number): { coins: number; gems: number } | null {
+    if (this.hasReceivedFirstClear(stageNumber)) return null;
+    const reward = PlayerData.firstClearReward(stageNumber);
+    this.data.firstClearedStages.push(stageNumber);
+    this.data.coins += reward.coins;
+    this.data.gems += reward.gems;
+    this.save();
+    return reward;
+  }
+
   // ====== デバッグ用リセット ======
 
   resetStageProgress(): void {
     this.data.highestStage = 0;
     this.data.totalRuns = 0;
+    this.data.firstClearedStages = [];
     this.save();
   }
 

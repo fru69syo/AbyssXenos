@@ -450,9 +450,15 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Spawn enemies (複数のサブグループからまとめて生成される可能性あり)
-    // 敵 HP はステージ数に比例してスケール (stage 1 = ×3、stage 15 = ×17)
-    // 序盤の敵が弱すぎて手応えが無い問題を解消するため +2 のオフセットを入れる
-    const hpMul = this.stageIndex + 3;
+    // 敵 HP のスケール:
+    //   - Stage 1〜3 は初期装備でも倒せるよう緩やかに (×1 / ×2 / ×3)
+    //   - Stage 4 以降はパーツ強化前提で急峻に (stageIndex + 3)
+    let hpMul: number;
+    if (this.stageIndex <= 2) {
+      hpMul = this.stageIndex + 1; // 1, 2, 3
+    } else {
+      hpMul = this.stageIndex + 3; // Stage 4=7, Stage 15=17
+    }
     const spawnCmds = this.waveManager.update(delta);
     for (const spawnCmd of spawnCmds) {
       const enemy = this.enemies.getFirstDead(false) as Enemy | null;
@@ -1139,20 +1145,38 @@ export class GameScene extends Phaser.Scene {
     this.playerData.addCoins(this.runState.coins);
     this.playerData.recordRun(clearedStageNumber);
 
-    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, `STAGE ${clearedStageNumber} CLEAR!`, {
+    // 初回クリアボーナス
+    const firstClearBonus = this.playerData.claimFirstClearBonus(clearedStageNumber);
+
+    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, `STAGE ${clearedStageNumber} CLEAR!`, {
       fontSize: '32px', color: '#00ff88', fontFamily: 'monospace', fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(50);
-    const subText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, `🪙 ${this.runState.coins} 獲得`, {
+    const subText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10, `🪙 ${this.runState.coins} 獲得`, {
       fontSize: '18px', color: '#ffd700', fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(50);
-    const hintText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 44, 'ロビーに戻ります…', {
+
+    const cleanups: Phaser.GameObjects.Text[] = [clearText, subText];
+
+    if (firstClearBonus) {
+      const bonusTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 28, '★ 初回クリアボーナス ★', {
+        fontSize: '16px', color: '#ffaa44', fontFamily: 'monospace', fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(50);
+      const bonusReward = this.add.text(
+        GAME_WIDTH / 2, GAME_HEIGHT / 2 + 54,
+        `🪙 +${firstClearBonus.coins}    💎 +${firstClearBonus.gems}`,
+        { fontSize: '20px', color: '#ffffff', fontFamily: 'monospace' },
+      ).setOrigin(0.5).setDepth(50);
+      cleanups.push(bonusTitle, bonusReward);
+    }
+
+    const hintY = firstClearBonus ? GAME_HEIGHT / 2 + 92 : GAME_HEIGHT / 2 + 36;
+    const hintText = this.add.text(GAME_WIDTH / 2, hintY, 'ロビーに戻ります…', {
       fontSize: '14px', color: '#aaaacc', fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(50);
+    cleanups.push(hintText);
 
-    this.time.delayedCall(2000, () => {
-      clearText.destroy();
-      subText.destroy();
-      hintText.destroy();
+    this.time.delayedCall(firstClearBonus ? 2800 : 2000, () => {
+      for (const t of cleanups) t.destroy();
       this.hud.destroy();
       this.touchControls.destroy();
       this.scene.start('LobbyScene');
@@ -1162,6 +1186,9 @@ export class GameScene extends Phaser.Scene {
   private onPlayerDeath(): void {
     if (this.dying) return;
     this.dying = true;
+    // 最終 HP (0) を HUD に反映: physics overlap で死亡したフレームの _update は
+    // dying=true により早期 return するため、ここで明示的に 1 度だけ更新する
+    this.updateHud();
     this.player.setActive(false);
     this.player.setVisible(false);
     this.player.destroyDrones();

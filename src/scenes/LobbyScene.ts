@@ -634,21 +634,34 @@ export class LobbyScene extends Phaser.Scene {
       fontSize: '17px', color: unlocked ? '#ff6688' : '#444444', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
-    const hpMul = index + 1;
+    // 実ゲームの hpMul に合わせる: stage1-3 は ×1/×2/×3、stage4+ は (stageIndex + 3)
+    const hpMul = index <= 2 ? index + 1 : index + 3;
     const mulText = this.add.text(0, 46, `敵HP ×${hpMul}`, {
       fontSize: '14px', color: unlocked ? '#88aadd' : '#333333', fontFamily: 'monospace',
     }).setOrigin(0.5);
 
     card.add([bg, stageLabel, nameText, waveText, bossText, mulText]);
 
+    // 初回クリア報酬の表示 (受領済みなら ✓ 表示)
+    const reward = PlayerData.firstClearReward(stageNum);
+    const received = this.playerData.hasReceivedFirstClear(stageNum);
+    const rewardLabel = received
+      ? `✓ 初回報酬受取済み`
+      : `初回報酬: 🪙${reward.coins}  💎${reward.gems}`;
+    const rewardColor = received ? '#666666' : (unlocked ? '#ffaa44' : '#333333');
+    const rewardText = this.add.text(0, 74, rewardLabel, {
+      fontSize: '13px', color: rewardColor, fontFamily: 'monospace',
+    }).setOrigin(0.5);
+    card.add(rewardText);
+
     if (!unlocked) {
-      const lock = this.add.text(0, 98, '🔒 LOCKED', {
+      const lock = this.add.text(0, 110, '🔒 LOCKED', {
         fontSize: '22px', color: '#666666', fontFamily: 'monospace',
       }).setOrigin(0.5);
       card.add(lock);
       card.setAlpha(0.5);
     } else if (stageNum <= highest) {
-      const cleared = this.add.text(0, 98, '✓ クリア済み', {
+      const cleared = this.add.text(0, 110, '✓ クリア済み', {
         fontSize: '16px', color: '#00ff88', fontFamily: 'monospace',
       }).setOrigin(0.5);
       card.add(cleared);

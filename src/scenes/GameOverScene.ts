@@ -22,10 +22,17 @@ export class GameOverScene extends Phaser.Scene {
     // Background
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x0a0a1e);
 
-    // Title
-    this.add.text(GAME_WIDTH / 2, 80, 'MISSION FAILED', {
-      fontSize: '32px',
-      color: '#ff4444',
+    // Title (緊急生命維持システム作動 → 帰還メッセージ)
+    this.add.text(GAME_WIDTH / 2, 60, '⚠ 緊急生命維持システム作動 ⚠', {
+      fontSize: '18px',
+      color: '#ffaa00',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    this.add.text(GAME_WIDTH / 2, 95, '帰還します', {
+      fontSize: '26px',
+      color: '#ff6644',
       fontFamily: 'monospace',
       fontStyle: 'bold',
     }).setOrigin(0.5);
