@@ -130,6 +130,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     bullet.hasMultiBounce = this.runState.hasMultiBounce;
     bullet.setScale(this.runState.bulletSizeMultiplier);
 
+    // ホーミング: 射出時に 1 回だけターゲットを固定し、その方向へ向ける。
+    // 以降は Bullet 側で弱い角度補正のみ行い、再ターゲットはしない。
+    if (this.runState.hasHoming) {
+      const target = this.pickHomingTarget(y, isRear);
+      if (target) {
+        const speed = Math.hypot(vx, vy) || this.runState.bulletSpeed;
+        const angle = Phaser.Math.Angle.Between(x, y, target.x, target.y);
+        let aimVx = Math.cos(angle) * speed;
+        let aimVy = Math.sin(angle) * speed;
+        if (isRear) aimVy = Math.max(aimVy, 0);
+        else aimVy = Math.min(aimVy, 0);
+        bullet.setVelocity(aimVx, aimVy);
+        bullet.setHomingTarget(target);
+      }
+    }
+
     // Elemental burst: random element per shot
     if (this.runState.hasElementalBurst) {
       const roll = Math.random();
@@ -207,6 +223,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return true; // dead
     }
     return false;
+  }
+
+  /** 射出時に追尾対象を 1 体だけ選ぶ。進行方向にある最近接敵。いなければ null。 */
+  private pickHomingTarget(fromY: number, isRear: boolean): Phaser.Physics.Arcade.Sprite | null {
+    const enemies = this.scene.children.getAll().filter(
+      (obj): obj is Phaser.Physics.Arcade.Sprite =>
+        obj instanceof Phaser.Physics.Arcade.Sprite &&
+        obj.getData('isEnemy') === true &&
+        obj.active &&
+        (isRear ? obj.y >= fromY : obj.y <= fromY)
+    );
+    if (enemies.length === 0) return null;
+    let closest = enemies[0];
+    let minDist = Phaser.Math.Distance.Between(this.x, fromY, closest.x, closest.y);
+    for (const e of enemies) {
+      const dist = Phaser.Math.Distance.Between(this.x, fromY, e.x, e.y);
+      if (dist < minDist) { closest = e; minDist = dist; }
+    }
+    return closest;
   }
 
   private fireThorns(): void {

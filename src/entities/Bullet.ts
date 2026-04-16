@@ -26,6 +26,8 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
   resumeSpeed: number = 260;
   private bounceCount: number = 0;
   private maxBounces: number = 3;
+  /** ホーミング対象 (射出時に固定。死亡後は再取得しない) */
+  private lockedTarget: Phaser.Physics.Arcade.Sprite | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
     super(scene, x, y, texture);
@@ -47,8 +49,15 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
     this.explodeIn = 0;
     this.stopAfter = 0;
     this.resumeAim = false;
+    // ホーミングロックは発射毎にクリア。前弾の参照を引き継がない。
+    this.lockedTarget = null;
     this.clearTint();
     playAnimIfExists(this, `${this.texture.key}_idle`);
+  }
+
+  /** 射出時に 1 回だけ呼び、追尾対象を固定する */
+  setHomingTarget(target: Phaser.Physics.Arcade.Sprite | null): void {
+    this.lockedTarget = target;
   }
 
   update(_time?: number, delta: number = 16): void {
@@ -99,31 +108,24 @@ export class Bullet extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    if (this.isHoming) {
-      // 進行方向の enemy だけを追尾対象にする。
-      // 前方弾 = 現在位置より上(または同じ y)の敵、後方弾 = 下の敵。
-      const isRear = this.isRearShot;
-      const enemies = this.scene.children.getAll().filter(
-        (obj): obj is Phaser.Physics.Arcade.Sprite =>
-          obj instanceof Phaser.Physics.Arcade.Sprite &&
-          obj.getData('isEnemy') === true &&
-          obj.active &&
-          (isRear ? obj.y >= this.y : obj.y <= this.y)
-      );
-
-      if (enemies.length > 0) {
-        let closest = enemies[0];
-        let minDist = Phaser.Math.Distance.Between(this.x, this.y, closest.x, closest.y);
-        for (const e of enemies) {
-          const dist = Phaser.Math.Distance.Between(this.x, this.y, e.x, e.y);
-          if (dist < minDist) { closest = e; minDist = dist; }
-        }
-        const angle = Phaser.Math.Angle.Between(this.x, this.y, closest.x, closest.y);
-        const speed = Math.sqrt(this.body!.velocity.x ** 2 + this.body!.velocity.y ** 2);
-        let newVx = Math.cos(angle) * speed;
-        let newVy = Math.sin(angle) * speed;
+    if (this.isHoming && this.lockedTarget && this.lockedTarget.active) {
+      // ロックした敵のみに微弱な角度補正を適用。再ターゲットは行わない。
+      // 対象が死亡/null の場合はそのまま直進する。
+      const targetAngle = Phaser.Math.Angle.Between(this.x, this.y, this.lockedTarget.x, this.lockedTarget.y);
+      const vx = this.body!.velocity.x;
+      const vy = this.body!.velocity.y;
+      const speed = Math.hypot(vx, vy);
+      if (speed > 0) {
+        const currentAngle = Math.atan2(vy, vx);
+        // 最短回転量 (-π 〜 +π) に正規化して 1 フレームあたりの旋回を制限
+        const diff = Phaser.Math.Angle.Wrap(targetAngle - currentAngle);
+        const MAX_TURN = 0.035; // ≒ 2°/frame。ほぼ真っ直ぐ飛ばしつつ動く敵に追従可能
+        const delta = Phaser.Math.Clamp(diff, -MAX_TURN, MAX_TURN);
+        const newAngle = currentAngle + delta;
+        let newVx = Math.cos(newAngle) * speed;
+        let newVy = Math.sin(newAngle) * speed;
         // 方向制約: 前方弾は後退禁止、後方弾は前進禁止
-        if (isRear) newVy = Math.max(newVy, 0);
+        if (this.isRearShot) newVy = Math.max(newVy, 0);
         else newVy = Math.min(newVy, 0);
         this.setVelocity(newVx, newVy);
       }
