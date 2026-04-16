@@ -532,8 +532,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateObstacles(delta: number): void {
-    // 定期スポーン: ~8 秒おきに 1 体、画面上部ランダム x。ボス戦時は出さない。
-    if (!this.boss) {
+    // 定期スポーン: ~8 秒おきに 1 体、画面上部ランダム x。
+    // Stage 6 (stageIndex >= 5) 以降のみ。ボス戦時は出さない。
+    if (!this.boss && this.stageIndex >= 5) {
       this.obstacleSpawnTimer += delta;
       const activeCount = this.obstacles.getChildren().filter(o => (o as Obstacle).active).length;
       if (this.obstacleSpawnTimer >= 8000 && activeCount < 3) {
