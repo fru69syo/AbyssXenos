@@ -77,7 +77,7 @@ export class LobbyScene extends Phaser.Scene {
     super('LobbyScene');
   }
 
-  create(): void {
+  create(data?: { tab?: TabKey }): void {
     this.playerData = new PlayerData();
     AudioManager.get().playBGM('lobby');
 
@@ -98,7 +98,8 @@ export class LobbyScene extends Phaser.Scene {
     this.createBottomNav();
     this.setupSwipeInput();
 
-    this.setTab('top');
+    // scene.restart({ tab }) で遷移前のタブを復元 (アップグレード購入時など)
+    this.setTab(data?.tab ?? 'top');
   }
 
   private createBackground(): void {
@@ -251,7 +252,7 @@ export class LobbyScene extends Phaser.Scene {
         btn.on('pointerdown', () => {
           if (this.playerData.spendCoins(cost)) {
             this.playerData.setUpgradeLevel(upg.id, level + 1);
-            this.scene.restart();
+            this.scene.restart({ tab: 'upgrade' });
           }
         });
       }
@@ -1000,7 +1001,7 @@ export class LobbyScene extends Phaser.Scene {
         bg: '#442222',
         onPress: () => {
           this.playerData.resetStageProgress();
-          this.scene.restart();
+          this.scene.restart({ tab: 'debug' });
         },
       },
       {
@@ -1009,7 +1010,7 @@ export class LobbyScene extends Phaser.Scene {
         bg: '#442222',
         onPress: () => {
           this.playerData.resetStatus();
-          this.scene.restart();
+          this.scene.restart({ tab: 'debug' });
         },
       },
       {
