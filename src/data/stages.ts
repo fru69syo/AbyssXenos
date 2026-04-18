@@ -20,10 +20,17 @@ export interface WaveData {
   duration?: number;
 }
 
+export type BossPattern = 'spread' | 'aimed' | 'spiral' | 'laser'
+  | 'ring' | 'burst_aimed' | 'cross' | 'scatter';
+
 export interface BossData {
   hp: number;
   speed: number;
-  attackPatterns: ('spread' | 'aimed' | 'spiral' | 'laser')[];
+  attackPatterns: BossPattern[];
+  /** 発狂 (HP50%以下) 時に追加されるパターン。省略時は attackPatterns と同じ */
+  ragePatterns?: BossPattern[];
+  /** 攻撃間隔 (ms)。省略時はボス=2000, 中ボス=1800 */
+  interval?: number;
 }
 
 export interface StageData {
@@ -83,7 +90,7 @@ export const STAGES: StageData[] = [
         duration: 18000,
       },
     ],
-    boss: { hp: 49, speed: 60, attackPatterns: ['spread'] },
+    boss: { hp: 49, speed: 60, attackPatterns: ['spread', 'aimed'] },
   },
 
   // ======== ステージ2: 外宇宙・零号域 [往路] ========
@@ -126,7 +133,7 @@ export const STAGES: StageData[] = [
         duration: 20000,
       },
     ],
-    boss: { hp: 77, speed: 70, attackPatterns: ['spread', 'aimed'] },
+    boss: { hp: 77, speed: 70, attackPatterns: ['spread', 'aimed', 'ring'], ragePatterns: ['ring', 'burst_aimed', 'spread'] },
   },
 
   // ======== ステージ3: 深海回廊 [往路] ========
@@ -153,7 +160,7 @@ export const STAGES: StageData[] = [
           G(2, 21, 'v', 140, 0, 300),
           G(5, 9, 'line', 140, 5000, 600),
         ],
-        midBoss: { hp: 59, speed: 60, attackPatterns: ['spread', 'spiral'] },
+        midBoss: { hp: 59, speed: 60, attackPatterns: ['spread', 'scatter'] },
         duration: 20000,
       },
       {
@@ -165,7 +172,7 @@ export const STAGES: StageData[] = [
         duration: 22000,
       },
     ],
-    boss: { hp: 119, speed: 80, attackPatterns: ['spread', 'aimed', 'spiral'] },
+    boss: { hp: 119, speed: 80, attackPatterns: ['spread', 'aimed', 'spiral'], ragePatterns: ['ring', 'burst_aimed', 'cross'] },
   },
 
   // ======== ステージ4: 暗黒海溝 [往路] ========
@@ -193,7 +200,7 @@ export const STAGES: StageData[] = [
           G(6, 15, 'random', 150, 0, 450),
           G(4, 30, 'burst', 180, 7000, 98),
         ],
-        midBoss: { hp: 91, speed: 70, attackPatterns: ['aimed', 'spiral', 'spread'] },
+        midBoss: { hp: 91, speed: 70, attackPatterns: ['aimed', 'scatter', 'ring'] },
         duration: 24000,
       },
       {
@@ -205,7 +212,7 @@ export const STAGES: StageData[] = [
         duration: 26000,
       },
     ],
-    boss: { hp: 182, speed: 90, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 182, speed: 90, attackPatterns: ['spread', 'aimed', 'ring', 'laser'], ragePatterns: ['burst_aimed', 'cross', 'ring', 'scatter'] },
   },
 
   // ======== ステージ5: 異界の裂け目 [往路] ========
@@ -233,7 +240,7 @@ export const STAGES: StageData[] = [
           G(4, 36, 'burst', 190, 6000, 83),
           G(5, 9, 'side', 160, 14000, 450),
         ],
-        midBoss: { hp: 133, speed: 80, attackPatterns: ['spread', 'aimed', 'spiral'] },
+        midBoss: { hp: 133, speed: 80, attackPatterns: ['spread', 'ring', 'burst_aimed'] },
         duration: 27000,
       },
       {
@@ -245,7 +252,7 @@ export const STAGES: StageData[] = [
         duration: 28000,
       },
     ],
-    boss: { hp: 266, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 266, speed: 100, attackPatterns: ['spread', 'aimed', 'cross', 'laser'], ragePatterns: ['ring', 'burst_aimed', 'scatter', 'cross'], interval: 1800 },
   },
 
   // ======== ステージ6: ゼノスの巣窟 [往路] ========
@@ -273,7 +280,7 @@ export const STAGES: StageData[] = [
           G(4, 36, 'burst', 200, 0, 83),
           G(5, 15, 'line', 170, 8000, 413),
         ],
-        midBoss: { hp: 154, speed: 75, attackPatterns: ['spread', 'aimed', 'spiral'] },
+        midBoss: { hp: 154, speed: 75, attackPatterns: ['cross', 'aimed', 'scatter'] },
         duration: 26000,
       },
       {
@@ -285,7 +292,7 @@ export const STAGES: StageData[] = [
         duration: 30000,
       },
     ],
-    boss: { hp: 308, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 308, speed: 100, attackPatterns: ['ring', 'aimed', 'cross', 'laser'], ragePatterns: ['burst_aimed', 'ring', 'scatter', 'cross'], interval: 1700 },
   },
 
   // ======== ステージ7: マザー・コア [特異点/完全シンクロ] ========
@@ -313,7 +320,7 @@ export const STAGES: StageData[] = [
           G(5, 21, 'random', 180, 0, 300),
           G(7, 6, 'side', 150, 8000, 675),
         ],
-        midBoss: { hp: 182, speed: 80, attackPatterns: ['spread', 'aimed', 'laser'] },
+        midBoss: { hp: 182, speed: 80, attackPatterns: ['ring', 'burst_aimed', 'laser'] },
         duration: 28000,
       },
       {
@@ -325,7 +332,7 @@ export const STAGES: StageData[] = [
         duration: 32000,
       },
     ],
-    boss: { hp: 350, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 350, speed: 100, attackPatterns: ['ring', 'cross', 'burst_aimed', 'laser'], ragePatterns: ['scatter', 'ring', 'burst_aimed', 'cross'], interval: 1600 },
   },
 
   // ======== ステージ8: 認知の狭間 [復路 - フィルター直後] ========
@@ -354,7 +361,7 @@ export const STAGES: StageData[] = [
           G(5, 18, 'random', 190, 6000, 300),
           G(4, 30, 'burst', 220, 14000, 75),
         ],
-        midBoss: { hp: 210, speed: 85, attackPatterns: ['spiral', 'aimed', 'spread'] },
+        midBoss: { hp: 210, speed: 85, attackPatterns: ['scatter', 'burst_aimed', 'ring'] },
         duration: 30000,
       },
       {
@@ -366,7 +373,7 @@ export const STAGES: StageData[] = [
         duration: 32000,
       },
     ],
-    boss: { hp: 392, speed: 105, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 392, speed: 105, attackPatterns: ['cross', 'burst_aimed', 'ring', 'laser'], ragePatterns: ['scatter', 'ring', 'burst_aimed', 'cross'], interval: 1500 },
   },
 
   // ======== ステージ9: 虚構の帰還路 [復路] ========
@@ -394,7 +401,7 @@ export const STAGES: StageData[] = [
           G(5, 21, 'random', 200, 0, 285),
           G(7, 8, 'side', 160, 9000, 675),
         ],
-        midBoss: { hp: 238, speed: 90, attackPatterns: ['spread', 'aimed', 'spiral'] },
+        midBoss: { hp: 238, speed: 90, attackPatterns: ['ring', 'cross', 'burst_aimed'] },
         duration: 30000,
       },
       {
@@ -406,7 +413,7 @@ export const STAGES: StageData[] = [
         duration: 34000,
       },
     ],
-    boss: { hp: 434, speed: 110, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 434, speed: 110, attackPatterns: ['ring', 'burst_aimed', 'cross', 'scatter'], ragePatterns: ['ring', 'cross', 'burst_aimed', 'laser'], interval: 1500 },
   },
 
   // ======== ステージ10: アセリア外縁 [復路 - 防衛艦隊を誤認] ========
@@ -435,7 +442,7 @@ export const STAGES: StageData[] = [
           G(5, 21, 'side', 190, 0, 338),
           G(7, 9, 'v', 160, 7000, 600),
         ],
-        midBoss: { hp: 266, speed: 90, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+        midBoss: { hp: 266, speed: 90, attackPatterns: ['ring', 'burst_aimed', 'cross', 'scatter'] },
         duration: 32000,
       },
       {
@@ -447,7 +454,7 @@ export const STAGES: StageData[] = [
         duration: 34000,
       },
     ],
-    boss: { hp: 476, speed: 115, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 476, speed: 115, attackPatterns: ['cross', 'ring', 'burst_aimed', 'laser'], ragePatterns: ['scatter', 'ring', 'cross', 'burst_aimed'], interval: 1400 },
   },
 
   // ======== ステージ11: 鏡面次元 [復路 - 認識反転] ========
@@ -476,7 +483,7 @@ export const STAGES: StageData[] = [
           G(5, 24, 'random', 210, 0, 285),
           G(2, 33, 'v', 200, 7000, 225),
         ],
-        midBoss: { hp: 294, speed: 95, attackPatterns: ['spread', 'spiral', 'laser'] },
+        midBoss: { hp: 294, speed: 95, attackPatterns: ['ring', 'cross', 'scatter'] },
         duration: 32000,
       },
       {
@@ -488,7 +495,7 @@ export const STAGES: StageData[] = [
         duration: 36000,
       },
     ],
-    boss: { hp: 504, speed: 115, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 504, speed: 115, attackPatterns: ['ring', 'cross', 'burst_aimed', 'scatter'], ragePatterns: ['ring', 'burst_aimed', 'cross', 'laser'], interval: 1400 },
   },
 
   // ======== ステージ12: 殉教者の空 [復路 - 子供たちの特攻機] ========
@@ -517,7 +524,7 @@ export const STAGES: StageData[] = [
           G(7, 9, 'v', 170, 0, 600),
           G(5, 21, 'side', 200, 6000, 338),
         ],
-        midBoss: { hp: 322, speed: 95, attackPatterns: ['spread', 'aimed', 'spiral'] },
+        midBoss: { hp: 322, speed: 95, attackPatterns: ['burst_aimed', 'ring', 'cross'] },
         duration: 34000,
       },
       {
@@ -529,7 +536,7 @@ export const STAGES: StageData[] = [
         duration: 36000,
       },
     ],
-    boss: { hp: 532, speed: 120, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 532, speed: 120, attackPatterns: ['cross', 'burst_aimed', 'ring', 'laser'], ragePatterns: ['scatter', 'ring', 'cross', 'burst_aimed'], interval: 1300 },
   },
 
   // ======== ステージ13: 防衛環 第一軌道 [復路 - 母星防衛ライン突破] ========
@@ -558,7 +565,7 @@ export const STAGES: StageData[] = [
           G(7, 11, 'v', 170, 0, 563),
           G(4, 42, 'burst', 260, 6000, 70),
         ],
-        midBoss: { hp: 350, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+        midBoss: { hp: 350, speed: 100, attackPatterns: ['ring', 'cross', 'burst_aimed', 'scatter'] },
         duration: 36000,
       },
       {
@@ -571,7 +578,7 @@ export const STAGES: StageData[] = [
         duration: 38000,
       },
     ],
-    boss: { hp: 560, speed: 125, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 560, speed: 125, attackPatterns: ['ring', 'cross', 'burst_aimed', 'scatter'], ragePatterns: ['ring', 'burst_aimed', 'cross', 'laser'], interval: 1300 },
   },
 
   // ======== ステージ14: 旗艦インフェルノ [最終 - かつての恩師の総司令艦] ========
@@ -600,7 +607,7 @@ export const STAGES: StageData[] = [
           G(7, 12, 'v', 170, 0, 563),
           G(5, 24, 'side', 210, 6000, 315),
         ],
-        midBoss: { hp: 378, speed: 100, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+        midBoss: { hp: 378, speed: 100, attackPatterns: ['cross', 'ring', 'burst_aimed', 'scatter'] },
         duration: 36000,
       },
       {
@@ -613,7 +620,7 @@ export const STAGES: StageData[] = [
         duration: 40000,
       },
     ],
-    boss: { hp: 602, speed: 130, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 602, speed: 130, attackPatterns: ['cross', 'ring', 'burst_aimed', 'laser'], ragePatterns: ['scatter', 'ring', 'cross', 'burst_aimed'], interval: 1200 },
   },
 
   // ======== ステージ15: 羽化の終点 アセリア [最終 - 母星殲滅/神への羽化] ========
@@ -645,7 +652,7 @@ export const STAGES: StageData[] = [
           G(5, 27, 'side', 230, 6000, 285),
           G(4, 45, 'burst', 280, 14000, 70),
         ],
-        midBoss: { hp: 448, speed: 110, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+        midBoss: { hp: 448, speed: 110, attackPatterns: ['ring', 'cross', 'burst_aimed', 'scatter'] },
         duration: 40000,
       },
       {
@@ -658,6 +665,6 @@ export const STAGES: StageData[] = [
         duration: 45000,
       },
     ],
-    boss: { hp: 700, speed: 140, attackPatterns: ['spread', 'aimed', 'spiral', 'laser'] },
+    boss: { hp: 700, speed: 140, attackPatterns: ['ring', 'cross', 'burst_aimed', 'scatter'], ragePatterns: ['ring', 'cross', 'burst_aimed', 'laser'], interval: 1100 },
   },
 ];
