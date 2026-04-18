@@ -146,6 +146,7 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   }
 
   takeDamage(amount: number): boolean {
+    if (this.entering) return false;
     this.hp -= amount;
 
     this.setTintFill(0xffffff);
