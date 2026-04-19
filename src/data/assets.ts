@@ -1,6 +1,7 @@
 import { COLORS } from '../config';
 import { ENEMIES } from './enemies';
 import { DROP_TYPES } from './dropTypes';
+import { PART_LINES } from './parts';
 
 /**
  * スプライトマニフェスト。
@@ -173,6 +174,30 @@ function fallbackDrop(key: string, shape: 'ticket' | 'gem' | 'part', color: numb
   };
 }
 
+function fallbackPlayerVariant(key: string, coreColor: number, mwColor: number): (scene: Phaser.Scene) => void {
+  return (scene) => {
+    const g = scene.add.graphics();
+    g.fillStyle(coreColor, 1);
+    g.fillTriangle(16, 0, 0, 32, 32, 32);
+    g.lineStyle(1, 0xffffff, 0.5);
+    g.strokeTriangle(16, 0, 0, 32, 32, 32);
+    g.fillStyle(mwColor, 1);
+    g.fillRect(6, 20, 6, 10);
+    g.fillRect(20, 20, 6, 10);
+    g.fillCircle(16, 12, 4);
+    g.generateTexture(key, 32, 32);
+    g.destroy();
+  };
+}
+
+// コア × メイン武器の自機テクスチャ組み合わせ
+const CORE_IDS = PART_LINES.filter(p => p.slot === 'core').map(p => p.id);
+const MW_IDS = PART_LINES.filter(p => p.slot === 'main_weapon').map(p => p.id);
+
+function getPartColor(lineId: string): number {
+  return PART_LINES.find(p => p.id === lineId)?.color ?? 0x4488aa;
+}
+
 // ====== マニフェスト本体 ======
 
 export const SPRITE_MANIFEST: SpriteSpec[] = [
@@ -198,15 +223,22 @@ export const SPRITE_MANIFEST: SpriteSpec[] = [
     frameWidth: 8, frameHeight: 8,
     fallback: fallbackBulletEnemy,
   },
-  // Enemies (ENEMIES 配列からキー/色を参照)
-  ...ENEMIES.map<SpriteSpec>((def) => ({
-    key: def.graphic,
-    file: `${def.graphic}.png`,
-    frameWidth: 24,
-    frameHeight: 24,
-    animations: [{ key: `${def.graphic}_idle`, frames: [0, 1], frameRate: 4, repeat: -1 }],
-    fallback: fallbackEnemy(def.graphic, def.color),
-  })),
+  // Enemies (ENEMIES 配列からキー/色を参照。重複キー除外)
+  ...(() => {
+    const seen = new Set<string>();
+    return ENEMIES.filter(def => {
+      if (seen.has(def.graphic)) return false;
+      seen.add(def.graphic);
+      return true;
+    }).map<SpriteSpec>((def) => ({
+      key: def.graphic,
+      file: `${def.graphic}.png`,
+      frameWidth: 24,
+      frameHeight: 24,
+      animations: [{ key: `${def.graphic}_idle`, frames: [0, 1], frameRate: 4, repeat: -1 }],
+      fallback: fallbackEnemy(def.graphic, def.color),
+    }));
+  })(),
   {
     key: 'boss', file: 'boss.png',
     frameWidth: 60, frameHeight: 50,
@@ -254,4 +286,18 @@ export const SPRITE_MANIFEST: SpriteSpec[] = [
     frameWidth: 16, frameHeight: 16,
     fallback: fallbackDrop('drop_rare_part', 'part', DROP_TYPES.rare_part.color),
   },
+  // 自機テクスチャ: コア × メイン武器 (8×8 = 64 パターン)
+  ...CORE_IDS.flatMap(core =>
+    MW_IDS.map<SpriteSpec>(mw => {
+      const key = `player_${core}_${mw}`;
+      return {
+        key,
+        file: `${key}.png`,
+        frameWidth: 32,
+        frameHeight: 32,
+        animations: [{ key: `${key}_idle`, frames: [0, 1, 2, 3], frameRate: 8, repeat: -1 }],
+        fallback: fallbackPlayerVariant(key, getPartColor(core), getPartColor(mw)),
+      };
+    })
+  ),
 ];

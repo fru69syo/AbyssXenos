@@ -104,28 +104,28 @@ export const ENEMIES: EnemyDef[] = [
 
   // ====== 新動作パターン敵 ======
   {
-    id: 8, key: 'seeker', name: 'シーカー', graphic: 'enemy_1',
+    id: 8, key: 'seeker', name: 'シーカー', graphic: 'enemy_8',
     color: 0xff6644, moveType: 'aim_straight', attackType: 'none', attackInterval: 0,
     hp: 5, exp: 8, coin: 1,
     specialDropFlag: false, specialDropType: 'none', specialDropChance: 0,
     scale: 1, speedMul: 1.1,
   },
   {
-    id: 9, key: 'orbiter', name: 'オービター', graphic: 'enemy_2',
+    id: 9, key: 'orbiter', name: 'オービター', graphic: 'enemy_9',
     color: 0xffaa22, moveType: 'orbit_forward', attackType: 'aimed_single', attackInterval: 1400,
     hp: 7, exp: 12, coin: 2,
     specialDropFlag: false, specialDropType: 'none', specialDropChance: 0,
     scale: 1, speedMul: 0.9,
   },
   {
-    id: 10, key: 'side_rusher', name: 'サイドラッシャー', graphic: 'enemy_4',
+    id: 10, key: 'side_rusher', name: 'サイドラッシャー', graphic: 'enemy_10',
     color: 0xffdd44, moveType: 'side_sway_forward', attackType: 'none', attackInterval: 0,
     hp: 6, exp: 10, coin: 2,
     specialDropFlag: false, specialDropType: 'none', specialDropChance: 0,
     scale: 1, speedMul: 1,
   },
   {
-    id: 11, key: 'side_hunter', name: 'サイドハンター', graphic: 'enemy_3',
+    id: 11, key: 'side_hunter', name: 'サイドハンター', graphic: 'enemy_11',
     color: 0xff44aa, moveType: 'side_sway_aim', attackType: 'aimed_double', attackInterval: 1600,
     hp: 9, exp: 18, coin: 3,
     specialDropFlag: false, specialDropType: 'none', specialDropChance: 0,
@@ -134,21 +134,21 @@ export const ENEMIES: EnemyDef[] = [
 
   // ====== 新攻撃パターン敵 ======
   {
-    id: 12, key: 'homer_drone', name: 'ホーマードローン', graphic: 'enemy_3',
+    id: 12, key: 'homer_drone', name: 'ホーマードローン', graphic: 'enemy_12',
     color: 0x44ffcc, moveType: 'slow_descent', attackType: 'homing', attackInterval: 1800,
     hp: 10, exp: 20, coin: 3,
     specialDropFlag: false, specialDropType: 'none', specialDropChance: 0,
     scale: 1, speedMul: 0.55,
   },
   {
-    id: 13, key: 'bomber', name: 'ボマー', graphic: 'enemy_7',
+    id: 13, key: 'bomber', name: 'ボマー', graphic: 'enemy_13',
     color: 0xff5522, moveType: 'slow_descent', attackType: 'delayed_explode', attackInterval: 2000,
     hp: 12, exp: 25, coin: 4,
     specialDropFlag: false, specialDropType: 'none', specialDropChance: 0,
     scale: 1.1, speedMul: 0.5,
   },
   {
-    id: 14, key: 'self_destruct', name: 'サイサイド', graphic: 'enemy_5',
+    id: 14, key: 'self_destruct', name: 'サイサイド', graphic: 'enemy_14',
     color: 0xff2222, moveType: 'aim_straight', attackType: 'none', attackInterval: 0,
     hp: 3, exp: 15, coin: 2,
     specialDropFlag: false, specialDropType: 'none', specialDropChance: 0,

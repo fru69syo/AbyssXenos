@@ -13,13 +13,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private drones: Phaser.GameObjects.Sprite[] = [];
   private shotCount: number = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
-    super(scene, x, y, 'player');
+  constructor(scene: Phaser.Scene, x: number, y: number, textureKey: string = 'player') {
+    super(scene, x, y, textureKey);
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setCollideWorldBounds(true);
     (this.body as Phaser.Physics.Arcade.Body).setSize(20, 20);
-    playAnimIfExists(this, 'player_idle');
+    playAnimIfExists(this, `${textureKey}_idle`);
   }
 
   init(runState: RunState, bulletGroup: Phaser.GameObjects.Group): void {

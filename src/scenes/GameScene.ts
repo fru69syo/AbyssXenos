@@ -9,7 +9,7 @@ import { RunState } from '../managers/RunState';
 import { SkillManager } from '../managers/SkillManager';
 import { WaveManager } from '../managers/WaveManager';
 import { PlayerData } from '../managers/PlayerData';
-import { calcPartStats, PartSlot } from '../data/parts';
+import { calcPartStats, PartSlot, parsePartKey } from '../data/parts';
 import { applyPartAbilities } from '../data/partAbilities';
 import { UPGRADES } from '../data/upgrades';
 import { getEnemyById } from '../data/enemies';
@@ -237,11 +237,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPlayer(): void {
-    this.player = new Player(this, GAME_WIDTH / 2, GAME_HEIGHT - 80);
+    const textureKey = this.getPlayerTextureKey();
+    this.player = new Player(this, GAME_WIDTH / 2, GAME_HEIGHT - 80, textureKey);
     this.player.setName('player');
     this.player.init(this.runState, this.playerBullets);
-    // Expose player to enemies / enemy bullets for aiming / homing
     this.registry.set('player', this.player);
+  }
+
+  private getPlayerTextureKey(): string {
+    const equipped = this.playerData.data.equippedParts as Record<PartSlot, string>;
+    const coreId = parsePartKey(equipped.core).lineId;
+    const mwId = parsePartKey(equipped.main_weapon).lineId;
+    const key = `player_${coreId}_${mwId}`;
+    return this.textures.exists(key) ? key : 'player';
   }
 
   private createParticles(): void {
